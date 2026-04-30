@@ -50,7 +50,7 @@ A private React + Vite + TypeScript image gallery app with searchable galleries,
   ```
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
   ```
-- **NEVER** force push to `develop`, `master`, or `main`.
+- **NEVER** force push to `develop`, `master`,.
 
 ### 7. DEAD CODE CLEANUP
 

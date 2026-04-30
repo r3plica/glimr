@@ -1,6 +1,6 @@
 ---
 name: gitflow-feature
-description: 'Manage the full git-flow feature branch lifecycle for the Glimr gallery app. Use when the user asks to "start a new feature", "begin a feature", "create a feature branch", or for any non-urgent code change. Covers: (1) Checking out and pulling develop, (2) Creating a git-flow feature branch, (3) After task completion - finishing the feature, creating a release branch derived from the last tag, finishing the release, pushing develop and master, and cleaning up local branches.'
+description: 'Manage the full git-flow feature branch lifecycle for the Glimr gallery app. Use when the user asks to "start a new feature", "begin a feature", "create a feature branch", or for any non-urgent code change. Covers: (1) Checking out and pulling develop, (2) Creating a git-flow feature branch, (3) After task completion - finishing the feature, creating a release branch derived from the last tag, finishing the release, pushing develop and main, and cleaning up local branches.'
 license: MIT
 allowed-tools: Bash
 ---
@@ -17,17 +17,17 @@ Activate this skill when the user says:
 - "start a new feature [name]"
 - "begin a feature [name]"
 - "create a feature branch [name]"
-- Any code-change request that is not an urgent fix on master
+- Any code-change request that is not an urgent fix on main
 
 ## Prerequisites
 
-Glimr uses git-flow. If `develop` and `master` branches do not yet exist, initialise once:
+Glimr uses git-flow. If `develop` and `main` branches do not yet exist, initialise once:
 
 ```bash
 git flow init -d
 ```
 
-(`-d` accepts default names: `master`, `develop`, `feature/`, `release/`, `hotfix/`.)
+(`-d` accepts default names: `main`, `develop`, `feature/`, `release/`, `hotfix/`.)
 
 ## Phase 1: Start the Feature
 
@@ -146,16 +146,16 @@ git flow release finish <version> -m "Release <version>"
 ```
 
 This will:
-- Merge `release/<version>` into `master`
-- Tag `master` with `<version>`
+- Merge `release/<version>` into `main`
+- Tag `main` with `<version>`
 - Merge `release/<version>` back into `develop`
 - Delete the local `release/<version>` branch
 
-### 8. Push develop, master, and tags
+### 8. Push develop, main, and tags
 
 ```bash
 git push origin develop
-git push origin master
+git push origin main
 git push origin --tags
 ```
 
@@ -184,6 +184,6 @@ git branch -d release/<version> 2>/dev/null || true
 - **NEVER** start Phase 2 autonomously — even if all tasks are complete and tests pass, you MUST wait for the user to explicitly say to merge
 - When your implementation work is done, state that the task is complete and you are waiting for the user's instruction to merge
 - **NEVER** use `--no-verify` or bypass pre-commit hooks
-- **NEVER** force push to `develop` or `master`
+- **NEVER** force push to `develop` or `main`
 - **ALWAYS** confirm the feature name and version with the user before finishing
 - If `git flow release finish` opens an editor for the tag message, pass `-m` to avoid interactive prompts

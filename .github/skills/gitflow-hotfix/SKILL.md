@@ -1,6 +1,6 @@
 ---
 name: gitflow-hotfix
-description: 'Manage the full git-flow hotfix branch lifecycle for the Glimr gallery app. Use when the user asks to "create a hotfix", "start a hotfix", or "fix a bug on master/main". Covers: (1) Creating a git-flow hotfix branch from master, (2) After the fix is committed - finishing the hotfix which merges into both master and develop, (3) Pushing develop and master with tags, and (4) Cleaning up the local hotfix branch.'
+description: 'Manage the full git-flow hotfix branch lifecycle for the Glimr gallery app. Use when the user asks to "create a hotfix", "start a hotfix", or "fix a bug on main/main". Covers: (1) Creating a git-flow hotfix branch from main, (2) After the fix is committed - finishing the hotfix which merges into both main and develop, (3) Pushing develop and main with tags, and (4) Cleaning up the local hotfix branch.'
 license: MIT
 allowed-tools: Bash
 ---
@@ -9,18 +9,18 @@ allowed-tools: Bash
 
 ## Overview
 
-Manages the complete lifecycle of a git-flow hotfix branch — from creation through merge to both `master` and `develop` — for urgent production fixes in Glimr.
+Manages the complete lifecycle of a git-flow hotfix branch — from creation through merge to both `main` and `develop` — for urgent production fixes in Glimr.
 
 ## Trigger Phrases
 
 Activate this skill when the user says:
 - "create a hotfix [name]"
 - "start a hotfix [name]"
-- "fix a bug on master [name]"
+- "fix a bug on main [name]"
 
 ## Prerequisites
 
-Glimr uses git-flow. If `develop` and `master` branches do not yet exist, initialise once:
+Glimr uses git-flow. If `develop` and `main` branches do not yet exist, initialise once:
 
 ```bash
 git flow init -d
@@ -50,7 +50,7 @@ Confirm the version with the user before proceeding.
 git flow hotfix start <version>
 ```
 
-This creates `hotfix/<version>` branched from `master`.
+This creates `hotfix/<version>` branched from `main`.
 
 Confirm to the user which branch is now active before proceeding with any work.
 
@@ -125,15 +125,15 @@ git flow hotfix finish <version> -m "Hotfix <version>"
 ```
 
 This will:
-- Merge `hotfix/<version>` into `master`
-- Tag `master` with `<version>`
+- Merge `hotfix/<version>` into `main`
+- Tag `main` with `<version>`
 - Merge `hotfix/<version>` back into `develop`
 - Delete the local `hotfix/<version>` branch
 
-### 5. Push develop, master, and tags
+### 5. Push develop, main, and tags
 
 ```bash
-git push origin master
+git push origin main
 git push origin develop
 git push origin --tags
 ```
@@ -152,7 +152,7 @@ git branch -d hotfix/<version> 2>/dev/null || true
 - **NEVER** start Phase 2 autonomously — even if the fix is complete and tests pass, you MUST wait for the user to explicitly say to merge
 - When your fix is done, state that the fix is complete and you are waiting for the user's instruction to merge
 - **NEVER** use `--no-verify` or bypass pre-commit hooks
-- **NEVER** force push to `develop` or `master`
+- **NEVER** force push to `develop` or `main`
 - **ALWAYS** confirm the hotfix version with the user before starting
 - Hotfix versions **always** increment the patch segment — never minor or major
 - If `git flow hotfix finish` opens an editor for the tag message, pass `-m` to avoid interactive prompts
