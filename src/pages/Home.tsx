@@ -2,11 +2,14 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useManifest } from "../lib/manifest";
 import { GalleryCard } from "../components/GalleryCard";
+import { FavoritesCard } from "../components/FavoritesCard";
 import { SearchBar } from "../components/SearchBar";
 import { searchGlobal } from "../lib/search";
+import { useFavorites } from "../lib/favorites";
 
 export function Home() {
   const { data, loading, error } = useManifest();
+  const { count: favCount } = useFavorites();
   const [query, setQuery] = useState("");
   const hits = useMemo(
     () => searchGlobal(data.galleries, query),
@@ -68,6 +71,7 @@ export function Home() {
         </p>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {favCount > 0 && !query.trim() && <FavoritesCard />}
           {grouped.map(({ gallery, matchedImage, imageMatchCount }) => (
             <div key={gallery.slug} className="flex flex-col">
               <GalleryCard gallery={gallery} highlightImage={matchedImage} />
