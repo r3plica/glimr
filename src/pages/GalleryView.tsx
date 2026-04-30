@@ -1,7 +1,7 @@
-import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Play } from "lucide-react";
-import { VirtuosoGrid } from "react-virtuoso";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, ChevronLeft, ChevronRight, Play } from "lucide-react";
+import { VirtuosoGrid, type VirtuosoGridHandle } from "react-virtuoso";
 import { useManifest } from "../lib/manifest";
 import type { GalleryImage } from "../types";
 import { SearchBar } from "../components/SearchBar";
@@ -82,12 +82,65 @@ function applyFilters(
 
 export function GalleryView() {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
   const { data, loading, error } = useManifest();
-  const gallery = data.galleries.find((g) => g.slug === slug);
+  const galleryIndex = data.galleries.findIndex((g) => g.slug === slug);
+  const gallery = galleryIndex >= 0 ? data.galleries[galleryIndex] : undefined;
+  const total = data.galleries.length;
+  const prevGallery =
+    total > 0 && galleryIndex >= 0
+      ? data.galleries[(galleryIndex - 1 + total) % total]
+      : undefined;
+  const nextGallery =
+    total > 0 && galleryIndex >= 0
+      ? data.galleries[(galleryIndex + 1) % total]
+      : undefined;
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [shuffleSeed, setShuffleSeed] = useState(1);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const [prevSlug, setPrevSlug] = useState(slug);
+  const gridRef = useRef<VirtuosoGridHandle>(null);
+
+  if (prevSlug !== slug) {
+    setPrevSlug(slug);
+    setQuery("");
+    setActiveIndex(null);
+  }
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "auto" });
+    }
+    gridRef.current?.scrollToIndex({ index: 0, behavior: "auto" });
+  }, [slug]);
+
+  useEffect(() => {
+    if (activeIndex !== null) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === "ArrowLeft" && prevGallery) {
+        e.preventDefault();
+        navigate(`/g/${prevGallery.slug}`);
+      } else if (e.key === "ArrowRight" && nextGallery) {
+        e.preventDefault();
+        navigate(`/g/${nextGallery.slug}`);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [activeIndex, prevGallery, nextGallery, navigate]);
 
   const handleFilters = (v: FilterState) => {
     if (v.sort === "random" && filters.sort !== "random") {
@@ -152,6 +205,34 @@ export function GalleryView() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {prevGallery && (
+              <Link
+                to={`/g/${prevGallery.slug}`}
+                title={`Previous: ${prevGallery.title}`}
+                aria-label={`Previous gallery: ${prevGallery.title}`}
+                data-testid="prev-gallery"
+                className="inline-flex items-center gap-1 rounded-lg border border-neutral-700 bg-neutral-900 px-2.5 py-2 text-sm text-neutral-100 transition hover:border-neutral-500 hover:bg-neutral-800"
+              >
+                <ChevronLeft size={16} />
+                <span className="hidden sm:inline max-w-[10ch] truncate">
+                  {prevGallery.title}
+                </span>
+              </Link>
+            )}
+            {nextGallery && (
+              <Link
+                to={`/g/${nextGallery.slug}`}
+                title={`Next: ${nextGallery.title}`}
+                aria-label={`Next gallery: ${nextGallery.title}`}
+                data-testid="next-gallery"
+                className="inline-flex items-center gap-1 rounded-lg border border-neutral-700 bg-neutral-900 px-2.5 py-2 text-sm text-neutral-100 transition hover:border-neutral-500 hover:bg-neutral-800"
+              >
+                <span className="hidden sm:inline max-w-[10ch] truncate">
+                  {nextGallery.title}
+                </span>
+                <ChevronRight size={16} />
+              </Link>
+            )}
             <button
               type="button"
               onClick={startSlideshow}
@@ -178,6 +259,7 @@ export function GalleryView() {
         </p>
       ) : (
         <VirtuosoGrid
+          ref={gridRef}
           totalCount={visible.length}
           overscan={600}
           className="flex-1"
