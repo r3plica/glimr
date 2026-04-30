@@ -20,6 +20,7 @@ async function clearGlimrState(page: Page, baseURL: string) {
     try {
       window.localStorage.removeItem("glimr.visited.v1");
       window.localStorage.removeItem("glimr.favorites.v1");
+      window.localStorage.removeItem("glimr.visitedFilter.v1");
     } catch {
       /* ignore */
     }
@@ -87,6 +88,33 @@ test.describe("Visited galleries", () => {
 
     await filter.click();
     await expect(filter).toHaveAttribute("data-state", "all");
+  });
+
+  test("visited filter is remembered across reloads", async ({ page }) => {
+    await page.goto(`/`);
+    const filter = page.getByTestId("visited-filter");
+    await expect(filter).toHaveAttribute("data-state", "all");
+
+    await filter.click();
+    await expect(filter).toHaveAttribute("data-state", "unviewed");
+
+    await page.reload();
+    await expect(page.getByTestId("visited-filter")).toHaveAttribute(
+      "data-state",
+      "unviewed"
+    );
+
+    await page.getByTestId("visited-filter").click();
+    await expect(page.getByTestId("visited-filter")).toHaveAttribute(
+      "data-state",
+      "viewed"
+    );
+
+    await page.goto(`/`);
+    await expect(page.getByTestId("visited-filter")).toHaveAttribute(
+      "data-state",
+      "viewed"
+    );
   });
 });
 

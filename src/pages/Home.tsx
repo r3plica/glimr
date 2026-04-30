@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Eye, EyeOff, Layers } from "lucide-react";
 import { useManifest } from "../lib/manifest";
@@ -23,12 +23,34 @@ const FILTER_LABEL: Record<VisitedFilter, string> = {
   viewed: "Viewed",
 };
 
+const VISITED_FILTER_KEY = "glimr.visitedFilter.v1";
+
+function loadVisitedFilter(): VisitedFilter {
+  try {
+    const raw = window.localStorage.getItem(VISITED_FILTER_KEY);
+    if (raw === "all" || raw === "unviewed" || raw === "viewed") return raw;
+  } catch {
+    /* ignore */
+  }
+  return "all";
+}
+
 export function Home() {
   const { data, loading, error } = useManifest();
   const { count: favCount } = useFavorites();
   const { has: hasVisited, count: visitedCount } = useVisited();
   const [query, setQuery] = useState("");
-  const [visitedFilter, setVisitedFilter] = useState<VisitedFilter>("all");
+  const [visitedFilter, setVisitedFilter] = useState<VisitedFilter>(
+    loadVisitedFilter
+  );
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(VISITED_FILTER_KEY, visitedFilter);
+    } catch {
+      /* ignore */
+    }
+  }, [visitedFilter]);
 
   const hits = useMemo(
     () => searchGlobal(data.galleries, query),
