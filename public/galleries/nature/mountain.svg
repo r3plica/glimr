@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="800" height="600" fill="#cbd5e1"/>
+  <polygon points="0,500 200,200 400,450 550,250 800,500 800,600 0,600" fill="#475569"/>
+  <polygon points="150,300 200,200 250,300" fill="#f8fafc"/>
+  <polygon points="500,300 550,250 600,300" fill="#f8fafc"/>
+  <text x="400" y="560" text-anchor="middle" font-family="sans-serif" font-size="36" fill="white">Mountain</text>
+</svg>

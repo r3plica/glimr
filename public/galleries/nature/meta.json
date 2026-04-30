@@ -1,0 +1,10 @@
+{
+  "title": "Nature",
+  "description": "Placeholder nature scenes",
+  "tags": ["nature", "outdoors"],
+  "imageTags": {
+    "mountain.svg": ["mountain", "snow"],
+    "ocean.svg": ["ocean", "water"],
+    "desert.svg": ["desert", "warm"]
+  }
+}
