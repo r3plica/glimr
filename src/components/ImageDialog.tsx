@@ -115,6 +115,7 @@ export function ImageDialog({
                 onClick={() => transformRef.current?.zoomOut()}
                 className="rounded p-2 text-neutral-300 hover:bg-neutral-800"
                 aria-label="Zoom out"
+                title="Zoom out (right-click image)"
               >
                 <ZoomOut size={16} />
               </button>
@@ -123,6 +124,7 @@ export function ImageDialog({
                 onClick={() => transformRef.current?.zoomIn()}
                 className="rounded p-2 text-neutral-300 hover:bg-neutral-800"
                 aria-label="Zoom in"
+                title="Zoom in (click image)"
               >
                 <ZoomIn size={16} />
               </button>
@@ -131,33 +133,42 @@ export function ImageDialog({
                 onClick={() => transformRef.current?.resetTransform()}
                 className="rounded p-2 text-neutral-300 hover:bg-neutral-800"
                 aria-label="Reset zoom"
+                title="Reset zoom"
               >
                 <RotateCcw size={16} />
               </button>
+              <span className="mx-1 h-5 w-px bg-neutral-800" aria-hidden />
               <button
                 type="button"
                 onClick={() => setAutoplay((a) => !a)}
                 className="rounded p-2 text-neutral-300 hover:bg-neutral-800"
                 aria-label={autoplay ? "Pause slideshow" : "Play slideshow"}
+                title={autoplay ? "Pause slideshow (Space)" : "Play slideshow (Space)"}
               >
                 {autoplay ? <Pause size={16} /> : <Play size={16} />}
               </button>
-              <select
-                value={intervalMs}
-                onChange={(e) => setIntervalMs(Number(e.target.value))}
-                className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-200"
-                aria-label="Slideshow interval"
-              >
-                <option value={2000}>2s</option>
-                <option value={4000}>4s</option>
-                <option value={6000}>6s</option>
-                <option value={10000}>10s</option>
-              </select>
+              <label className="flex items-center gap-1 text-xs text-neutral-400">
+                <span className="hidden sm:inline">Speed</span>
+                <select
+                  value={intervalMs}
+                  onChange={(e) => setIntervalMs(Number(e.target.value))}
+                  className="rounded border border-neutral-700 bg-neutral-900 px-2 py-1 text-xs text-neutral-200"
+                  aria-label="Slideshow interval"
+                  title="Time between slides"
+                >
+                  <option value={2000}>2s</option>
+                  <option value={4000}>4s</option>
+                  <option value={6000}>6s</option>
+                  <option value={10000}>10s</option>
+                </select>
+              </label>
+              <span className="mx-1 h-5 w-px bg-neutral-800" aria-hidden />
               <button
                 type="button"
                 onClick={() => current && downloadSingleImage(current)}
                 className="rounded p-2 text-neutral-300 hover:bg-neutral-800"
                 aria-label="Download image"
+                title="Download this image"
               >
                 <Download size={16} />
               </button>
@@ -174,6 +185,7 @@ export function ImageDialog({
                   type="button"
                   className="rounded p-2 text-neutral-300 hover:bg-neutral-800"
                   aria-label="Close"
+                  title="Close (Esc)"
                 >
                   <X size={16} />
                 </button>
@@ -185,7 +197,7 @@ export function ImageDialog({
             {current && (
               <TransformWrapper
                 ref={transformRef}
-                doubleClick={{ mode: "toggle" }}
+                doubleClick={{ disabled: true }}
                 wheel={{ step: 0.2 }}
                 minScale={1}
                 maxScale={8}
@@ -194,21 +206,44 @@ export function ImageDialog({
               >
                 <TransformComponent
                   wrapperClass="!w-full !h-full"
-                  contentClass="!w-full !h-full flex items-center justify-center"
+                  contentClass="!w-full !h-full"
                 >
-                  <img
-                    src={viewUrl(current)}
-                    alt={current.filename}
-                    className="max-h-full max-w-full select-none object-contain"
-                    draggable={false}
-                  />
+                  <div
+                    data-testid="dialog-backdrop"
+                    onClick={(e) => {
+                      if (e.target === e.currentTarget) onClose();
+                    }}
+                    onContextMenu={(e) => {
+                      if (e.target === e.currentTarget) e.preventDefault();
+                    }}
+                    className="flex h-full w-full items-center justify-center"
+                  >
+                    <img
+                      src={viewUrl(current)}
+                      alt={current.filename}
+                      className="max-h-full max-w-full select-none object-contain"
+                      draggable={false}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        transformRef.current?.zoomIn();
+                      }}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        transformRef.current?.zoomOut();
+                      }}
+                    />
+                  </div>
                 </TransformComponent>
               </TransformWrapper>
             )}
 
             <button
               type="button"
-              onClick={goPrev}
+              onClick={(e) => {
+                e.stopPropagation();
+                goPrev();
+              }}
               className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-neutral-200 hover:bg-black/70"
               aria-label="Previous image"
             >
@@ -216,7 +251,10 @@ export function ImageDialog({
             </button>
             <button
               type="button"
-              onClick={goNext}
+              onClick={(e) => {
+                e.stopPropagation();
+                goNext();
+              }}
               className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 text-neutral-200 hover:bg-black/70"
               aria-label="Next image"
             >

@@ -87,14 +87,21 @@ Get-Content build-results.txt | Select-Object -Last 10
 ```
 Build must succeed with exit code 0. (`npm run build` runs `tsc -b && vite build`, so this also type-checks.)
 
-#### b) Playwright E2E tests
+#### b) Unit tests (Vitest)
+```bash
+cmd /c "npm run test 2>&1" > test-results.txt
+Get-Content test-results.txt | Select-Object -Last 10
+```
+All Vitest suites must pass.
+
+#### c) Playwright E2E tests
 ```bash
 cmd /c "npm run test:e2e -- --reporter=list 2>&1" > playwright-results.txt
 Get-Content playwright-results.txt | Select-Object -Last 10
 ```
 All e2e tests must pass with 0 failures.
 
-#### c) Lint (ALWAYS LAST)
+#### d) Lint (ALWAYS LAST)
 ```bash
 cmd /c "npm run lint 2>&1" > lint-results.txt
 Get-Content lint-results.txt | Select-Object -Last 10
