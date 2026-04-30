@@ -36,4 +36,6 @@ playwright/.cache/
 build-results.txt
 lint-results.txt
 playwright-results.txt
+test-results.txt
+unit-results.txt
 pw*.txt

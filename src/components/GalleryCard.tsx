@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import type { Gallery, GalleryImage } from "../types";
 import { thumbUrl } from "../lib/storage";
+import { useVisited } from "../lib/visited";
 
 interface Props {
   gallery: Gallery;
@@ -8,6 +9,8 @@ interface Props {
 }
 
 export function GalleryCard({ gallery, highlightImage }: Props) {
+  const { has } = useVisited();
+  const visited = has(gallery.slug);
   const coverImage =
     highlightImage ||
     gallery.images.find((i) => i.src === gallery.cover) ||
@@ -15,7 +18,9 @@ export function GalleryCard({ gallery, highlightImage }: Props) {
   return (
     <Link
       to={`/g/${gallery.slug}`}
-      className="group block overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 transition hover:border-neutral-600"
+      data-testid="gallery-card"
+      data-visited={visited ? "true" : "false"}
+      className="group relative block overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 transition hover:border-neutral-600"
     >
       <div className="aspect-[4/3] overflow-hidden bg-neutral-800">
         {coverImage && (
@@ -24,12 +29,28 @@ export function GalleryCard({ gallery, highlightImage }: Props) {
             alt={gallery.title}
             loading="lazy"
             decoding="async"
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+            className={
+              "h-full w-full object-cover transition duration-500 group-hover:scale-105 " +
+              (visited ? "opacity-50 saturate-50 group-hover:opacity-80" : "")
+            }
           />
+        )}
+        {visited && (
+          <span
+            data-testid="visited-badge"
+            className="absolute right-2 top-2 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow"
+          >
+            Viewed
+          </span>
         )}
       </div>
       <div className="p-3">
-        <h3 className="truncate font-medium text-neutral-100">
+        <h3
+          className={
+            "truncate font-medium " +
+            (visited ? "text-neutral-400" : "text-neutral-100")
+          }
+        >
           {gallery.title}
         </h3>
         <p className="mt-1 text-xs text-neutral-400">

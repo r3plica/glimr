@@ -77,6 +77,14 @@ function orientationOf(w, h) {
   return "square";
 }
 
+function sizeBucketFromDims(w, h) {
+  if (!w || !h) return "unknown";
+  const mp = (w * h) / 1_000_000;
+  if (mp >= 8) return "large";
+  if (mp >= 2) return "medium";
+  return "small";
+}
+
 function sizeSegOf(url) {
   if (!url) return null;
   const m = url.match(/\/s(\d+)(?:-[^/]*)?\//);
@@ -156,7 +164,7 @@ async function processGallery(entryName) {
       height,
       orientation: orientationOf(width, height),
       sizeSeg: seg,
-      sizeBucket: sizeBucket(seg),
+      sizeBucket: sizeBucketFromDims(width, height),
       hash: hashes[i],
     };
   });
