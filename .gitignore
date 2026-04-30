@@ -31,3 +31,9 @@ public/manifest.json
 test-results/
 playwright-report/
 playwright/.cache/
+
+# local quality-gate logs
+build-results.txt
+lint-results.txt
+playwright-results.txt
+pw*.txt

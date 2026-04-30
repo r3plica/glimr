@@ -19,17 +19,27 @@ import {
 import type { GalleryImage } from "../types";
 import { viewUrl } from "../lib/storage";
 import { downloadSingleImage } from "../lib/zip";
+import { HeartButton } from "./HeartButton";
 
 interface Props {
   images: GalleryImage[];
   index: number | null;
   onClose: () => void;
   onIndexChange: (index: number) => void;
+  gallerySlug: string;
+  galleryTitle: string;
 }
 
 const AUTOPLAY_DEFAULT_MS = 4000;
 
-export function ImageDialog({ images, index, onClose, onIndexChange }: Props) {
+export function ImageDialog({
+  images,
+  index,
+  onClose,
+  onIndexChange,
+  gallerySlug,
+  galleryTitle,
+}: Props) {
   const open = index !== null;
   const current = index !== null ? images[index] : null;
   const [autoplay, setAutoplay] = useState(false);
@@ -151,6 +161,14 @@ export function ImageDialog({ images, index, onClose, onIndexChange }: Props) {
               >
                 <Download size={16} />
               </button>
+              {current && (
+                <HeartButton
+                  variant="toolbar"
+                  gallerySlug={gallerySlug}
+                  galleryTitle={galleryTitle}
+                  image={current}
+                />
+              )}
               <Dialog.Close asChild>
                 <button
                   type="button"

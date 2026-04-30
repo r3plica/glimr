@@ -189,6 +189,8 @@ export function GalleryView() {
                 key={img.src}
                 image={img}
                 onOpen={() => setActiveIndex(i)}
+                gallerySlug={gallery.slug}
+                galleryTitle={gallery.title}
               />
             );
           }}
@@ -200,6 +202,8 @@ export function GalleryView() {
         index={activeIndex}
         onClose={() => setActiveIndex(null)}
         onIndexChange={setActiveIndex}
+        gallerySlug={gallery.slug}
+        galleryTitle={gallery.title}
       />
     </div>
   );
