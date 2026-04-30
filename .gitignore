@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Gallery image files - keep folder structure but ignore contents
+public/galleries/*/
+public/manifest.json
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/

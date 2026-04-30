@@ -1,23 +1,24 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import manifest from "../data/manifest.json";
-import type { Manifest } from "../types";
+import { useManifest } from "../lib/manifest";
 import { GalleryCard } from "../components/GalleryCard";
 import { SearchBar } from "../components/SearchBar";
 import { searchGlobal } from "../lib/search";
 
-const data = manifest as Manifest;
-
 export function Home() {
+  const { data, loading, error } = useManifest();
   const [query, setQuery] = useState("");
-  const hits = useMemo(() => searchGlobal(data.galleries, query), [query]);
+  const hits = useMemo(
+    () => searchGlobal(data.galleries, query),
+    [data.galleries, query]
+  );
 
   const grouped = useMemo(() => {
     const map = new Map<
       string,
       {
         gallery: (typeof data.galleries)[number];
-        matchedImage?: string;
+        matchedImage?: (typeof data.galleries)[number]["images"][number];
         imageMatchCount: number;
       }
     >();
@@ -26,12 +27,12 @@ export function Home() {
       if (!existing) {
         map.set(h.gallery.slug, {
           gallery: h.gallery,
-          matchedImage: h.image?.src,
+          matchedImage: h.image,
           imageMatchCount: h.type === "image" ? 1 : 0,
         });
       } else if (h.type === "image") {
         existing.imageMatchCount += 1;
-        if (!existing.matchedImage) existing.matchedImage = h.image?.src;
+        if (!existing.matchedImage) existing.matchedImage = h.image;
       }
     }
     return Array.from(map.values());
@@ -53,7 +54,13 @@ export function Home() {
         />
       </header>
 
-      {data.galleries.length === 0 ? (
+      {loading ? (
+        <p className="py-16 text-center text-neutral-500">Loading manifest...</p>
+      ) : error ? (
+        <p className="py-16 text-center text-red-400">
+          Failed to load manifest: {error}
+        </p>
+      ) : data.galleries.length === 0 ? (
         <EmptyState />
       ) : grouped.length === 0 ? (
         <p className="py-16 text-center text-neutral-500">
@@ -63,10 +70,7 @@ export function Home() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {grouped.map(({ gallery, matchedImage, imageMatchCount }) => (
             <div key={gallery.slug} className="flex flex-col">
-              <GalleryCard
-                gallery={gallery}
-                highlightImageSrc={matchedImage}
-              />
+              <GalleryCard gallery={gallery} highlightImage={matchedImage} />
               {imageMatchCount > 0 && (
                 <p className="mt-1 text-[11px] text-neutral-500">
                   {imageMatchCount} image match

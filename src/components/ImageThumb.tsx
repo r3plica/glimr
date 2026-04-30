@@ -11,12 +11,13 @@ export function ImageThumb({ image, onOpen }: Props) {
     <button
       type="button"
       onClick={onOpen}
-      className="group relative aspect-square overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900 transition hover:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-500"
+      className="group relative aspect-square w-full overflow-hidden rounded-lg border border-neutral-800 bg-neutral-900 transition hover:border-neutral-600 focus:outline-none focus:ring-2 focus:ring-neutral-500"
     >
       <img
-        src={thumbUrl(image.src)}
+        src={thumbUrl(image)}
         alt={image.filename}
         loading="lazy"
+        decoding="async"
         className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
       />
       <span className="pointer-events-none absolute inset-x-0 bottom-0 truncate bg-gradient-to-t from-black/80 to-transparent px-2 py-1 text-left text-[11px] text-neutral-200 opacity-0 transition group-hover:opacity-100">

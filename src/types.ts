@@ -1,9 +1,16 @@
+export type Orientation = "portrait" | "landscape" | "square" | "unknown";
+export type SizeBucket = "small" | "medium" | "large" | "unknown";
+
 export interface GalleryImage {
   src: string;
   filename: string;
   tags?: string[];
   width?: number;
   height?: number;
+  sourceUrl?: string | null;
+  orientation?: Orientation;
+  sizeSeg?: number | null;
+  sizeBucket?: SizeBucket;
 }
 
 export interface Gallery {

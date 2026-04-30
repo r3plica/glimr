@@ -1,25 +1,29 @@
 import { Link } from "react-router-dom";
-import type { Gallery } from "../types";
+import type { Gallery, GalleryImage } from "../types";
 import { thumbUrl } from "../lib/storage";
 
 interface Props {
   gallery: Gallery;
-  highlightImageSrc?: string;
+  highlightImage?: GalleryImage;
 }
 
-export function GalleryCard({ gallery, highlightImageSrc }: Props) {
-  const cover = highlightImageSrc || gallery.cover || gallery.images[0]?.src;
+export function GalleryCard({ gallery, highlightImage }: Props) {
+  const coverImage =
+    highlightImage ||
+    gallery.images.find((i) => i.src === gallery.cover) ||
+    gallery.images[0];
   return (
     <Link
       to={`/g/${gallery.slug}`}
       className="group block overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 transition hover:border-neutral-600"
     >
       <div className="aspect-[4/3] overflow-hidden bg-neutral-800">
-        {cover && (
+        {coverImage && (
           <img
-            src={thumbUrl(cover)}
+            src={thumbUrl(coverImage)}
             alt={gallery.title}
             loading="lazy"
+            decoding="async"
             className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
           />
         )}
@@ -29,7 +33,7 @@ export function GalleryCard({ gallery, highlightImageSrc }: Props) {
           {gallery.title}
         </h3>
         <p className="mt-1 text-xs text-neutral-400">
-          {gallery.images.length} image
+          {gallery.images.length.toLocaleString()} image
           {gallery.images.length === 1 ? "" : "s"}
         </p>
         {gallery.tags && gallery.tags.length > 0 && (

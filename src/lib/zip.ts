@@ -1,7 +1,7 @@
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
-import type { Gallery } from "../types";
-import { resolveUrl } from "./storage";
+import type { Gallery, GalleryImage } from "../types";
+import { downloadUrl } from "./storage";
 
 export async function downloadGalleryAsZip(
   gallery: Gallery,
@@ -14,7 +14,7 @@ export async function downloadGalleryAsZip(
 
   await Promise.all(
     gallery.images.map(async (img) => {
-      const res = await fetch(resolveUrl(img.src));
+      const res = await fetch(downloadUrl(img));
       if (!res.ok) throw new Error(`Failed to fetch ${img.src}`);
       const blob = await res.blob();
       folder.file(img.filename, blob);
@@ -28,11 +28,10 @@ export async function downloadGalleryAsZip(
 }
 
 export async function downloadSingleImage(
-  src: string,
-  filename: string
+  image: GalleryImage
 ): Promise<void> {
-  const res = await fetch(resolveUrl(src));
-  if (!res.ok) throw new Error(`Failed to fetch ${src}`);
+  const res = await fetch(downloadUrl(image));
+  if (!res.ok) throw new Error(`Failed to fetch ${image.src}`);
   const blob = await res.blob();
-  saveAs(blob, filename);
+  saveAs(blob, image.filename);
 }

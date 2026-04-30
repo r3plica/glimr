@@ -17,7 +17,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import type { GalleryImage } from "../types";
-import { resolveUrl } from "../lib/storage";
+import { viewUrl } from "../lib/storage";
 import { downloadSingleImage } from "../lib/zip";
 
 interface Props {
@@ -145,10 +145,7 @@ export function ImageDialog({ images, index, onClose, onIndexChange }: Props) {
               </select>
               <button
                 type="button"
-                onClick={() =>
-                  current &&
-                  downloadSingleImage(current.src, current.filename)
-                }
+                onClick={() => current && downloadSingleImage(current)}
                 className="rounded p-2 text-neutral-300 hover:bg-neutral-800"
                 aria-label="Download image"
               >
@@ -182,7 +179,7 @@ export function ImageDialog({ images, index, onClose, onIndexChange }: Props) {
                   contentClass="!w-full !h-full flex items-center justify-center"
                 >
                   <img
-                    src={resolveUrl(current.src)}
+                    src={viewUrl(current)}
                     alt={current.filename}
                     className="max-h-full max-w-full select-none object-contain"
                     draggable={false}
@@ -210,7 +207,7 @@ export function ImageDialog({ images, index, onClose, onIndexChange }: Props) {
 
             <div aria-hidden className="hidden">
               {preload.map((img) => (
-                <img key={img.src} src={resolveUrl(img.src)} alt="" />
+                <img key={img.src} src={viewUrl(img)} alt="" />
               ))}
             </div>
           </div>
