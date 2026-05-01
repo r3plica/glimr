@@ -39,3 +39,5 @@ playwright-results.txt
 test-results.txt
 unit-results.txt
 pw*.txt
+
+public/galleries/_site_summary.csv
