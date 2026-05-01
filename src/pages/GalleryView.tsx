@@ -10,7 +10,7 @@ import { DownloadGalleryButton } from "../components/DownloadGalleryButton";
 import { FilterBar, type FilterState } from "../components/FilterBar";
 import { searchImages } from "../lib/search";
 import { applyFilters } from "../lib/filters";
-import { markVisited } from "../lib/visited";
+import { markVisited, useVisited } from "../lib/visited";
 
 const DEFAULT_FILTERS: FilterState = {
   orientation: "any",
@@ -25,14 +25,25 @@ export function GalleryView() {
   const galleryIndex = data.galleries.findIndex((g) => g.slug === slug);
   const gallery = galleryIndex >= 0 ? data.galleries[galleryIndex] : undefined;
   const total = data.galleries.length;
-  const prevGallery =
-    total > 0 && galleryIndex >= 0
-      ? data.galleries[(galleryIndex - 1 + total) % total]
-      : undefined;
-  const nextGallery =
-    total > 0 && galleryIndex >= 0
-      ? data.galleries[(galleryIndex + 1) % total]
-      : undefined;
+  const { has: hasVisited } = useVisited();
+
+  const { prevGallery, nextGallery } = useMemo(() => {
+    if (total === 0 || galleryIndex < 0) {
+      return { prevGallery: undefined, nextGallery: undefined };
+    }
+    const findInDirection = (dir: 1 | -1) => {
+      for (let step = 1; step < total; step++) {
+        const idx = ((galleryIndex + dir * step) % total + total) % total;
+        const g = data.galleries[idx];
+        if (!hasVisited(g.slug)) return g;
+      }
+      return data.galleries[((galleryIndex + dir) % total + total) % total];
+    };
+    return {
+      prevGallery: findInDirection(-1),
+      nextGallery: findInDirection(1),
+    };
+  }, [data.galleries, galleryIndex, total, hasVisited]);
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [shuffleSeed, setShuffleSeed] = useState(1);
