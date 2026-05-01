@@ -104,7 +104,7 @@ glimr/
 ## Developer Workflows
 
 ```bash
-npm run dev          # Vite dev server on http://localhost:5173 (predev rebuilds manifest)
+npm run dev          # Vite dev server on http://localhost:5174 (predev rebuilds manifest)
 npm run manifest     # Rebuild public/manifest.json only (e.g. after adding new gallery folders while dev is running)
 npm run build        # tsc -b && vite build (prebuild rebuilds manifest)
 npm run preview      # Preview production build
