@@ -44,7 +44,9 @@ export function ImageDialog({
   const current = index !== null ? images[index] : null;
   const [autoplay, setAutoplay] = useState(false);
   const [intervalMs, setIntervalMs] = useState(AUTOPLAY_DEFAULT_MS);
+  const [scale, setScale] = useState(1);
   const transformRef = useRef<ReactZoomPanPinchRef | null>(null);
+  const pannedRef = useRef(false);
 
   const goPrev = () => {
     if (index === null) return;
@@ -198,11 +200,19 @@ export function ImageDialog({
               <TransformWrapper
                 ref={transformRef}
                 doubleClick={{ disabled: true }}
-                wheel={{ step: 0.2 }}
+                wheel={{ step: 0.12 }}
+                smooth={false}
                 minScale={1}
                 maxScale={8}
                 centerOnInit
                 limitToBounds
+                onTransform={(_, state) => setScale(state.scale)}
+                onPanningStart={() => {
+                  pannedRef.current = false;
+                }}
+                onPanning={() => {
+                  pannedRef.current = true;
+                }}
               >
                 <TransformComponent
                   wrapperClass="!w-full !h-full"
@@ -211,7 +221,12 @@ export function ImageDialog({
                   <div
                     data-testid="dialog-backdrop"
                     onClick={(e) => {
-                      if (e.target === e.currentTarget) onClose();
+                      if (pannedRef.current) {
+                        pannedRef.current = false;
+                        return;
+                      }
+                      if (e.target === e.currentTarget && scale <= 1.001)
+                        onClose();
                     }}
                     onContextMenu={(e) => {
                       if (e.target === e.currentTarget) e.preventDefault();
@@ -225,7 +240,11 @@ export function ImageDialog({
                       draggable={false}
                       onClick={(e) => {
                         e.stopPropagation();
-                        transformRef.current?.zoomIn();
+                        if (pannedRef.current) {
+                          pannedRef.current = false;
+                          return;
+                        }
+                        if (scale <= 1.001) transformRef.current?.zoomIn();
                       }}
                       onContextMenu={(e) => {
                         e.preventDefault();
