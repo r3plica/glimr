@@ -138,6 +138,85 @@ test.describe("Image dialog UX", () => {
 
     await expect(page.getByRole("button", { name: /close/i })).toHaveCount(0);
   });
+
+  test("panning while zoomed does not close the dialog", async ({
+    page,
+    baseURL,
+  }) => {
+    const m = await manifest(baseURL!);
+    const slug = m.galleries[0].slug;
+
+    await page.goto(`/g/${slug}`);
+    await page.locator("button:has(img[alt])").first().click();
+    await expect(page.getByRole("button", { name: /close/i })).toBeVisible();
+
+    // Zoom in twice via toolbar so panning is meaningful.
+    await page.getByRole("button", { name: /zoom in/i }).click();
+    await page.getByRole("button", { name: /zoom in/i }).click();
+
+    const backdrop = page.getByTestId("dialog-backdrop");
+    const box = await backdrop.boundingBox();
+    if (!box) throw new Error("no backdrop bounding box");
+
+    const cx = box.x + box.width / 2;
+    const cy = box.y + box.height / 2;
+
+    // Drag from center toward an edge; release should land on a
+    // backdrop area but must not close the dialog because we panned.
+    await page.mouse.move(cx, cy);
+    await page.mouse.down();
+    await page.mouse.move(cx + 200, cy + 150, { steps: 15 });
+    await page.mouse.up();
+
+    await expect(page.getByRole("button", { name: /close/i })).toBeVisible();
+  });
+
+  test("a single mouse wheel tick does not jump zoom to the maximum", async ({
+    page,
+    baseURL,
+  }) => {
+    const m = await manifest(baseURL!);
+    const slug = m.galleries[0].slug;
+
+    await page.goto(`/g/${slug}`);
+    await page.locator("button:has(img[alt])").first().click();
+    await expect(page.getByRole("button", { name: /close/i })).toBeVisible();
+
+    // Dispatch a single wheel event on the transform wrapper. Using
+    // dispatchEvent avoids platform-specific quirks of page.mouse.wheel.
+    await page.evaluate(() => {
+      const wrapper = document.querySelector(
+        ".react-transform-wrapper"
+      ) as HTMLElement | null;
+      if (!wrapper) throw new Error("no transform wrapper");
+      const rect = wrapper.getBoundingClientRect();
+      const ev = new WheelEvent("wheel", {
+        deltaY: -100,
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+        bubbles: true,
+        cancelable: true,
+      });
+      wrapper.dispatchEvent(ev);
+    });
+
+    // Allow rzpp's animation frame to apply the transform.
+    await page.waitForTimeout(300);
+
+    const scale = await page.evaluate(() => {
+      const el = document.querySelector(
+        ".react-transform-component"
+      ) as HTMLElement | null;
+      if (!el) return 1;
+      const t = window.getComputedStyle(el).transform;
+      if (!t || t === "none") return 1;
+      const match = t.match(/matrix\(([^,]+),/);
+      return match ? parseFloat(match[1]) : 1;
+    });
+
+    expect(scale).toBeGreaterThan(1);
+    expect(scale).toBeLessThan(1.5);
+  });
 });
 
 test.describe("Gallery image filters", () => {
