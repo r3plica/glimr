@@ -5,15 +5,21 @@ import { VirtuosoGrid } from "react-virtuoso";
 import { ImageThumb } from "../components/ImageThumb";
 import { ImageDialog } from "../components/ImageDialog";
 import { clearFavorites, useFavorites } from "../lib/favorites";
+import { remapFavoriteImage, useMovedImages } from "../lib/movedImages";
+import { DuplicatesLink } from "../components/DuplicatesLink";
 
 const FAVORITES_SLUG = "__favorites__";
 const FAVORITES_TITLE = "Favorites";
 
 export function Favorites() {
   const { favorites } = useFavorites();
+  const movedImages = useMovedImages();
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
-  const images = useMemo(() => favorites.map((f) => f.image), [favorites]);
+  const images = useMemo(
+    () => favorites.map((favorite) => remapFavoriteImage(favorite.image, movedImages)),
+    [favorites, movedImages]
+  );
 
   const startSlideshow = () => {
     if (images.length === 0) return;
@@ -49,6 +55,7 @@ export function Favorites() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <DuplicatesLink />
             <button
               type="button"
               onClick={startSlideshow}
@@ -92,7 +99,7 @@ export function Favorites() {
             return (
               <ImageThumb
                 key={`${fav.gallerySlug}::${fav.filename}`}
-                image={fav.image}
+                image={images[i]}
                 onOpen={() => setActiveIndex(i)}
                 gallerySlug={fav.gallerySlug}
                 galleryTitle={fav.galleryTitle}

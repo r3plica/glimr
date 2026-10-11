@@ -1,26 +1,23 @@
 // Offline gallery preparation. Run with `npm run galleries:prepare`.
 //
 // Scans public/galleries/*, probes image dimensions and SHA-256 hashes every
-// image (cached in data/image-cache.json so unchanged files are not re-read),
-// verifies the candidate duplicate groups produced by
-// `npm run galleries:duplicates` (data/duplicates.json) and writes:
+// image (cached in data/image-cache.json so unchanged files are not re-read)
+// and writes:
 //   public/manifest.json                 lightweight catalogue (no image lists)
 //   public/data/galleries/<slug>.json    full image details per gallery
 //   public/data/search-index.json        filenames + tags for global search
-//   data/prepare-report.json             merges, rejected candidates, problems
+//   public/data/moved-images.json        old image src -> new src after merges
+//   data/prepare-report.json             aliases, problems
 //
-// A candidate folder is merged into its group's canonical gallery only when its
-// full contents (every image hash, including repeats) match. Source folders and
-// files are never modified.
+// Galleries merged by `npm run galleries:duplicates -- --apply` are listed in
+// data/folder-aliases.json; their old slugs become aliases of the folder they
+// were merged into so old URLs keep working. Source files are never modified.
 
-import { promises as fs, createReadStream } from "node:fs";
+import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { createHash } from "node:crypto";
-import sharp from "sharp";
 import {
   IMAGE_EXT,
-  contentSignature,
   naturalCompare,
   orientationOf,
   selectCovers,
@@ -28,8 +25,16 @@ import {
   sizeSegOf,
   slugify,
   titleCase,
-  verifyDuplicateGroups,
 } from "./lib/galleries.mjs";
+import {
+  createProbeStats,
+  loadCache,
+  mapLimit,
+  probeImage,
+  readJson,
+  saveCache,
+  writeJson,
+} from "./lib/image-cache.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -38,28 +43,14 @@ const MANIFEST_FILE = path.join(ROOT, "public", "manifest.json");
 const PUBLIC_DATA_DIR = path.join(ROOT, "public", "data");
 const DETAIL_DIR = path.join(PUBLIC_DATA_DIR, "galleries");
 const SEARCH_FILE = path.join(PUBLIC_DATA_DIR, "search-index.json");
+const MOVED_IMAGES_FILE = path.join(PUBLIC_DATA_DIR, "moved-images.json");
 const DATA_DIR = path.join(ROOT, "data");
-const DUPLICATES_FILE = path.join(DATA_DIR, "duplicates.json");
+const ALIASES_FILE = path.join(DATA_DIR, "folder-aliases.json");
 const CACHE_FILE = path.join(DATA_DIR, "image-cache.json");
 const REPORT_FILE = path.join(DATA_DIR, "prepare-report.json");
 
 const FORMAT_VERSION = 2;
-const CACHE_VERSION = 1;
 const CONCURRENCY = 16;
-
-async function readJson(file, fallback) {
-  try {
-    return JSON.parse(await fs.readFile(file, "utf8"));
-  } catch (err) {
-    if (err.code === "ENOENT") return fallback;
-    throw new Error(`Could not read ${path.relative(ROOT, file)}: ${err.message}`);
-  }
-}
-
-async function writeJson(file, value, pretty = false) {
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, JSON.stringify(value, null, pretty ? 2 : 0) + "\n", "utf8");
-}
 
 async function readUrlMap(dir) {
   // Map<index1Based, url>, paired to filenames "<paddedIndex>-<safe>.<ext>".
@@ -76,106 +67,19 @@ async function readUrlMap(dir) {
   }
 }
 
-function hashFile(file) {
-  return new Promise((resolve, reject) => {
-    const h = createHash("sha256");
-    createReadStream(file)
-      .on("error", reject)
-      .on("data", (chunk) => h.update(chunk))
-      .on("end", () => resolve(h.digest("hex")));
-  });
-}
-
-async function mapLimit(items, limit, fn) {
-  const out = new Array(items.length);
-  let cursor = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(limit, items.length) }, async () => {
-      while (cursor < items.length) {
-        const i = cursor++;
-        out[i] = await fn(items[i], i);
-      }
-    })
-  );
-  return out;
-}
-
-async function loadCache() {
-  const raw = await readJson(CACHE_FILE, null);
-  if (!raw || raw.version !== CACHE_VERSION || typeof raw.entries !== "object") {
-    return new Map();
-  }
-  return new Map(Object.entries(raw.entries));
-}
-
-async function saveCache(cache) {
-  await writeJson(CACHE_FILE, { version: CACHE_VERSION, entries: Object.fromEntries(cache) });
-}
-
-async function loadDuplicateGroups() {
-  const raw = await readJson(DUPLICATES_FILE, null);
-  if (!raw) {
-    console.warn(
-      `[prepare] ${path.relative(ROOT, DUPLICATES_FILE)} not found; no galleries will be merged. ` +
-        "Run `npm run galleries:duplicates` first to detect duplicates."
-    );
-    return [];
-  }
-  const valid =
-    raw.version === 1 &&
-    Array.isArray(raw.groups) &&
-    raw.groups.every(
-      (g) =>
-        g &&
-        typeof g.root === "string" &&
-        Array.isArray(g.duplicates) &&
-        g.duplicates.every((d) => typeof d === "string")
-    );
-  if (!valid) {
+async function loadFolderAliases() {
+  const raw = await readJson(ALIASES_FILE, null);
+  if (!raw) return { galleries: {}, images: {} };
+  if (raw.version !== 1 || typeof raw.galleries !== "object" || typeof raw.images !== "object") {
     throw new Error(
-      `${path.relative(ROOT, DUPLICATES_FILE)} is not a version 1 duplicates file. ` +
-        "Re-run `npm run galleries:duplicates`."
+      `${path.relative(ROOT, ALIASES_FILE)} is not a version 1 folder aliases file. ` +
+        "It is written by `npm run galleries:duplicates -- --apply`."
     );
   }
-  return raw.groups;
+  return raw;
 }
 
-const stats = { hashed: 0, cached: 0, unreadable: [] };
-
-async function probeImage(dirName, filename, cache) {
-  const rel = `${dirName}/${filename}`;
-  const file = path.join(GALLERIES_DIR, dirName, filename);
-  let st;
-  try {
-    st = await fs.stat(file);
-  } catch (err) {
-    stats.unreadable.push({ file: rel, error: err.message });
-    return { width: 0, height: 0, hash: null };
-  }
-  const hit = cache.get(rel);
-  if (hit && hit[0] === st.size && hit[1] === st.mtimeMs) {
-    stats.cached++;
-    return { width: hit[2], height: hit[3], hash: hit[4] };
-  }
-  let width = 0;
-  let height = 0;
-  let hash = null;
-  try {
-    hash = await hashFile(file);
-  } catch (err) {
-    stats.unreadable.push({ file: rel, error: err.message });
-  }
-  try {
-    const m = await sharp(file).metadata();
-    width = m.width || 0;
-    height = m.height || 0;
-  } catch {
-    // Unprobeable images keep 0x0 and fall into the "unknown" buckets.
-  }
-  stats.hashed++;
-  if (hash) cache.set(rel, [st.size, st.mtimeMs, width, height, hash]);
-  return { width, height, hash };
-}
+const stats = createProbeStats();
 
 async function scanGallery(dirName, cache) {
   const dir = path.join(GALLERIES_DIR, dirName);
@@ -186,7 +90,7 @@ async function scanGallery(dirName, cache) {
 
   const meta = await readJson(path.join(dir, "meta.json"), {}).catch(() => ({}));
   const urlMap = await readUrlMap(dir);
-  const probes = await mapLimit(files, CONCURRENCY, (f) => probeImage(dirName, f, cache));
+  const probes = await mapLimit(files, CONCURRENCY, (f) => probeImage(GALLERIES_DIR, dirName, f, cache, stats));
   const imageTags = meta.imageTags || {};
 
   const images = files.map((filename, i) => {
@@ -233,8 +137,8 @@ function assertSafeSlug(slug, dir) {
 async function main() {
   const started = Date.now();
   await fs.mkdir(GALLERIES_DIR, { recursive: true });
-  const groups = await loadDuplicateGroups();
-  const cache = await loadCache();
+  const folderAliases = await loadFolderAliases();
+  const cache = await loadCache(CACHE_FILE);
 
   const dirs = (await fs.readdir(GALLERIES_DIR, { withFileTypes: true }))
     .filter((e) => e.isDirectory())
@@ -251,22 +155,25 @@ async function main() {
       );
     }
     // Persist progress periodically so an interrupted first run is not wasted.
-    if (stats.hashed > 0 && (i + 1) % 200 === 0) await saveCache(cache);
+    if (stats.hashed > 0 && (i + 1) % 200 === 0) await saveCache(CACHE_FILE, cache);
   }
-  await saveCache(cache);
+  await saveCache(CACHE_FILE, cache);
 
   const byDir = new Map(scanned.map((g) => [g.dir, g]));
-  const signatureByDir = new Map(
-    scanned.map((g) => [g.dir, contentSignature(g.images.map((img) => img.hash))])
-  );
-  const { aliasOf, merges, rejected, missing } = verifyDuplicateGroups(groups, signatureByDir);
-
-  const canonical = scanned.filter((g) => !aliasOf.has(g.dir));
+  const liveSlugs = new Set(scanned.map((g) => g.slug));
+  const canonical = scanned;
   const aliasesByDir = new Map();
-  for (const [aliasDir, rootDir] of aliasOf) {
-    const list = aliasesByDir.get(rootDir) ?? [];
-    list.push(byDir.get(aliasDir).slug);
-    aliasesByDir.set(rootDir, list);
+  const staleAliases = [];
+  for (const [slug, dir] of Object.entries(folderAliases.galleries)) {
+    // A live gallery always owns its slug; an alias to a missing folder is stale.
+    if (liveSlugs.has(slug)) continue;
+    if (!byDir.has(dir)) {
+      staleAliases.push({ slug, dir });
+      continue;
+    }
+    const list = aliasesByDir.get(dir) ?? [];
+    list.push(slug);
+    aliasesByDir.set(dir, list);
   }
 
   canonical.sort((a, b) => a.title.localeCompare(b.title));
@@ -326,6 +233,7 @@ async function main() {
 
   const generatedAt = new Date().toISOString();
   await writeJson(SEARCH_FILE, { formatVersion: FORMAT_VERSION, galleries: searchGalleries });
+  await writeJson(MOVED_IMAGES_FILE, { formatVersion: FORMAT_VERSION, images: folderAliases.images });
   await writeJson(MANIFEST_FILE, { formatVersion: FORMAT_VERSION, generatedAt, galleries: summaries });
   await writeJson(
     REPORT_FILE,
@@ -336,19 +244,18 @@ async function main() {
       images: canonical.reduce((n, g) => n + g.images.length, 0),
       imagesProbed: stats.hashed,
       imagesFromCache: stats.cached,
-      merges: merges.map((m) => ({ canonical: m.canonical, aliases: m.aliases })),
-      rejectedCandidates: rejected,
-      missingCandidateFolders: missing,
+      aliases: Object.fromEntries(aliasesByDir),
+      staleAliases,
       unreadableImages: stats.unreadable,
     },
     true
   );
 
-  const merged = merges.reduce((n, m) => n + m.aliases.length, 0);
+  const aliasCount = [...aliasesByDir.values()].reduce((n, list) => n + list.length, 0);
   const seconds = ((Date.now() - started) / 1000).toFixed(1);
   console.log(
-    `[prepare] ${canonical.length} galleries (${merged} duplicate folders merged, ` +
-      `${rejected.length} candidates rejected, ${missing.length} missing) in ${seconds}s`
+    `[prepare] ${canonical.length} galleries (${aliasCount} merged gallery aliases, ` +
+      `${staleAliases.length} stale) in ${seconds}s`
   );
   if (stats.unreadable.length > 0) {
     console.warn(`[prepare] ${stats.unreadable.length} unreadable images; see ${path.relative(ROOT, REPORT_FILE)}`);

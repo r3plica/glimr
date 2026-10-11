@@ -2,10 +2,13 @@ import { Link } from "react-router-dom";
 import { Heart } from "lucide-react";
 import { thumbUrl } from "../lib/storage";
 import { useFavorites } from "../lib/favorites";
+import { remapFavoriteImage, useMovedImages } from "../lib/movedImages";
 
 export function FavoritesCard() {
   const { favorites, count } = useFavorites();
-  const cover = favorites[0]?.image;
+  const movedImages = useMovedImages();
+  const favoriteCover = favorites[0]?.image;
+  const cover = favoriteCover ? remapFavoriteImage(favoriteCover, movedImages) : undefined;
 
   return (
     <Link
