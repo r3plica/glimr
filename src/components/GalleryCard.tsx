@@ -1,20 +1,17 @@
 import { Link } from "react-router-dom";
-import type { Gallery, GalleryImage } from "../types";
+import type { GallerySummary, GalleryImage } from "../types";
 import { thumbUrl } from "../lib/storage";
 import { useVisited } from "../lib/visited";
 
 interface Props {
-  gallery: Gallery;
+  gallery: GallerySummary;
   highlightImage?: GalleryImage;
 }
 
 export function GalleryCard({ gallery, highlightImage }: Props) {
-  const { has } = useVisited();
-  const visited = has(gallery.slug);
-  const coverImage =
-    highlightImage ||
-    gallery.images.find((i) => i.src === gallery.cover) ||
-    gallery.images[0];
+  const { hasGallery } = useVisited();
+  const visited = hasGallery(gallery);
+  const coverImage = highlightImage || gallery.cover;
   return (
     <Link
       to={`/g/${gallery.slug}`}
@@ -54,8 +51,8 @@ export function GalleryCard({ gallery, highlightImage }: Props) {
           {gallery.title}
         </h3>
         <p className="mt-1 text-xs text-neutral-400">
-          {gallery.images.length.toLocaleString()} image
-          {gallery.images.length === 1 ? "" : "s"}
+          {gallery.imageCount.toLocaleString()} image
+          {gallery.imageCount === 1 ? "" : "s"}
         </p>
         {gallery.tags && gallery.tags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">

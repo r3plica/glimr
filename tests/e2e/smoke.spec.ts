@@ -89,16 +89,24 @@ test.describe("Glimr smoke", () => {
     const dupPaths = [...pathCounts.entries()].filter(([, n]) => n > 1);
     expect(dupPaths, `duplicate cover paths: ${JSON.stringify(dupPaths)}`).toEqual([]);
 
-    // 2. No two galleries' covers share the same bytes (content-level dedup)
-    const hashes = await Promise.all(
-      manifest.galleries.map(async (g) => {
-        const r = await request.get(`${baseURL}${g.cover}`);
-        expect(r.ok(), `failed to fetch ${g.cover}`).toBeTruthy();
-        const buf = await r.body();
-        const hash = createHash("sha1").update(buf).digest("hex");
-        return { slug: g.slug, hash };
-      })
-    );
+    // 2. No two galleries' covers share the same bytes (content-level dedup).
+    // Fetch in small batches: one request per gallery at once overflows the
+    // dev server's connection backlog on large collections.
+    const hashes: { slug: string; hash: string }[] = [];
+    for (let i = 0; i < manifest.galleries.length; i += 16) {
+      const batch = manifest.galleries.slice(i, i + 16);
+      hashes.push(
+        ...(await Promise.all(
+          batch.map(async (g) => {
+            const r = await request.get(`${baseURL}${g.cover}`);
+            expect(r.ok(), `failed to fetch ${g.cover}`).toBeTruthy();
+            const buf = await r.body();
+            const hash = createHash("sha1").update(buf).digest("hex");
+            return { slug: g.slug, hash };
+          })
+        ))
+      );
+    }
     const hashMap = new Map<string, string[]>();
     for (const { slug, hash } of hashes) {
       const arr = hashMap.get(hash) ?? [];
@@ -116,8 +124,8 @@ test.describe("Glimr smoke", () => {
     const manifest = await loadManifest(baseURL!);
     expect(manifest.galleries.length).toBeGreaterThan(1);
     const target = manifest.galleries[0];
-    // Use the first 4 chars of the slug as a query — likely unique enough.
-    const query = target.slug.slice(0, 4);
+    // The full title ranks the target first, so it lands on page 1.
+    const query = target.title;
 
     await page.goto("/");
     await page.getByRole("textbox").first().fill(query);

@@ -1,83 +1,113 @@
 import Fuse from "fuse.js";
-import type { Gallery, GalleryImage } from "../types";
+import type { GallerySummary, GalleryImage, SearchIndex } from "../types";
 
 export interface GlobalHit {
   type: "gallery" | "image";
-  gallery: Gallery;
+  gallery: GallerySummary;
   image?: GalleryImage;
   score?: number;
 }
 
-interface FlatRow {
-  type: "gallery" | "image";
-  gallerySlug: string;
-  galleryTitle: string;
-  galleryDescription: string;
-  galleryTags: string;
-  imageFilename: string;
-  imageTags: string;
+interface ImageOccurrence {
+  slug: string;
+  image: GalleryImage;
 }
 
-export function buildGlobalIndex(galleries: Gallery[]) {
-  const rows: { row: FlatRow; gallery: Gallery; image?: GalleryImage }[] = [];
-  for (const g of galleries) {
-    rows.push({
-      gallery: g,
-      row: {
-        type: "gallery",
-        gallerySlug: g.slug,
-        galleryTitle: g.title,
-        galleryDescription: g.description || "",
-        galleryTags: (g.tags || []).join(" "),
-        imageFilename: "",
-        imageTags: "",
-      },
-    });
-    for (const img of g.images) {
-      rows.push({
-        gallery: g,
-        image: img,
-        row: {
-          type: "image",
-          gallerySlug: g.slug,
-          galleryTitle: g.title,
-          galleryDescription: g.description || "",
-          galleryTags: (g.tags || []).join(" "),
-          imageFilename: img.filename,
-          imageTags: (img.tags || []).join(" "),
+// Many galleries reuse the same filenames, so fuzzy-match each distinct
+// filename/tags combination once and expand the matches to every occurrence.
+interface UniqueImageRow {
+  filename: string;
+  tags: string[];
+  occurrences: ImageOccurrence[];
+}
+
+const imageIndexes = new WeakMap<SearchIndex, Fuse<UniqueImageRow>>();
+const galleryIndexes = new WeakMap<GallerySummary[], Fuse<GallerySummary>>();
+const summaryMaps = new WeakMap<GallerySummary[], Map<string, GallerySummary>>();
+
+function getImageIndex(index: SearchIndex) {
+  const cached = imageIndexes.get(index);
+  if (cached) return cached;
+  const rows = new Map<string, UniqueImageRow>();
+  for (const detail of index.galleries) {
+    for (const img of detail.images) {
+      const tags = img.tags ?? [];
+      const key = `${img.filename}\u0000${tags.join("\u0000")}`;
+      let row = rows.get(key);
+      if (!row) {
+        row = { filename: img.filename, tags, occurrences: [] };
+        rows.set(key, row);
+      }
+      row.occurrences.push({
+        slug: detail.slug,
+        image: {
+          src: `/galleries/${detail.dir}/${img.filename}`,
+          filename: img.filename,
+          tags: img.tags,
         },
       });
     }
   }
-  const fuse = new Fuse(rows, {
+  const fuse = new Fuse([...rows.values()], {
     includeScore: true,
     threshold: 0.4,
     ignoreLocation: true,
     keys: [
-      { name: "row.galleryTitle", weight: 3 },
-      { name: "row.galleryDescription", weight: 1 },
-      { name: "row.galleryTags", weight: 2 },
-      { name: "row.imageFilename", weight: 2 },
-      { name: "row.imageTags", weight: 2 },
+      { name: "filename", weight: 2 },
+      { name: "tags", weight: 2 },
     ],
   });
-  return { fuse, rows };
+  imageIndexes.set(index, fuse);
+  return fuse;
+}
+
+function getGalleryIndex(galleries: GallerySummary[]) {
+  let fuse = galleryIndexes.get(galleries);
+  if (!fuse) {
+    fuse = new Fuse(galleries, {
+      includeScore: true,
+      threshold: 0.4,
+      ignoreLocation: true,
+      keys: [
+        { name: "title", weight: 3 },
+        { name: "description", weight: 1 },
+        { name: "tags", weight: 2 },
+      ],
+    });
+    galleryIndexes.set(galleries, fuse);
+  }
+  return fuse;
+}
+
+function getSummaryMap(galleries: GallerySummary[]) {
+  let map = summaryMaps.get(galleries);
+  if (!map) {
+    map = new Map(galleries.map((g) => [g.slug, g]));
+    summaryMaps.set(galleries, map);
+  }
+  return map;
 }
 
 export function searchGlobal(
-  galleries: Gallery[],
+  galleries: GallerySummary[],
+  index: SearchIndex | null,
   query: string
 ): GlobalHit[] {
   if (!query.trim()) {
-    return galleries.map((g) => ({ type: "gallery" as const, gallery: g }));
+    return galleries.map((gallery) => ({ type: "gallery", gallery }));
   }
-  const { fuse } = buildGlobalIndex(galleries);
-  return fuse.search(query).map((r) => ({
-    type: r.item.row.type,
-    gallery: r.item.gallery,
-    image: r.item.image,
-    score: r.score,
-  }));
+  if (!index) return [];
+  const hits: GlobalHit[] = getGalleryIndex(galleries)
+    .search(query)
+    .map((r) => ({ type: "gallery", gallery: r.item, score: r.score }));
+  const summaries = getSummaryMap(galleries);
+  for (const r of getImageIndex(index).search(query)) {
+    for (const { slug, image } of r.item.occurrences) {
+      const gallery = summaries.get(slug);
+      if (gallery) hits.push({ type: "image", gallery, image, score: r.score });
+    }
+  }
+  return hits.sort((a, b) => (a.score ?? 0) - (b.score ?? 0));
 }
 
 export function searchImages(

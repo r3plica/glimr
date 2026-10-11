@@ -26,6 +26,8 @@ dist-ssr
 # Gallery image files - keep folder structure but ignore contents
 public/galleries/*/
 public/manifest.json
+public/data/
+/data/
 
 # Playwright
 test-results/

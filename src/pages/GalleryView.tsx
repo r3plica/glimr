@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, ChevronLeft, ChevronRight, Play } from "lucide-react";
 import { VirtuosoGrid, type VirtuosoGridHandle } from "react-virtuoso";
-import { useManifest } from "../lib/manifest";
+import { resolveGallery, useGallery, useManifest } from "../lib/manifest";
 import { SearchBar } from "../components/SearchBar";
 import { ImageThumb } from "../components/ImageThumb";
 import { ImageDialog } from "../components/ImageDialog";
@@ -22,10 +22,12 @@ export function GalleryView() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const { data, loading, error } = useManifest();
-  const galleryIndex = data.galleries.findIndex((g) => g.slug === slug);
-  const gallery = galleryIndex >= 0 ? data.galleries[galleryIndex] : undefined;
+  const gallery = resolveGallery(data.galleries, slug);
+  const canonicalSlug = gallery?.slug;
+  const galleryIndex = data.galleries.findIndex((g) => g.slug === canonicalSlug);
+  const { data: detail, loading: galleryLoading, error: galleryError } = useGallery(canonicalSlug);
   const total = data.galleries.length;
-  const { has: hasVisited } = useVisited();
+  const { hasGallery: hasVisited } = useVisited();
 
   const { prevGallery, nextGallery } = useMemo(() => {
     if (total === 0 || galleryIndex < 0) {
@@ -35,7 +37,7 @@ export function GalleryView() {
       for (let step = 1; step < total; step++) {
         const idx = ((galleryIndex + dir * step) % total + total) % total;
         const g = data.galleries[idx];
-        if (!hasVisited(g.slug)) return g;
+        if (!hasVisited(g)) return g;
       }
       return data.galleries[((galleryIndex + dir) % total + total) % total];
     };
@@ -65,8 +67,8 @@ export function GalleryView() {
   }, [slug]);
 
   useEffect(() => {
-    if (slug) markVisited(slug);
-  }, [slug]);
+    if (canonicalSlug) markVisited(canonicalSlug);
+  }, [canonicalSlug]);
 
   useEffect(() => {
     if (activeIndex !== null) return;
@@ -103,10 +105,10 @@ export function GalleryView() {
   };
 
   const visible = useMemo(() => {
-    if (!gallery) return [];
-    const filtered = applyFilters(gallery.images, filters, shuffleSeed);
+    if (!detail) return [];
+    const filtered = applyFilters(detail.images, filters, shuffleSeed);
     return query.trim() ? searchImages(filtered, query) : filtered;
-  }, [gallery, filters, shuffleSeed, query]);
+  }, [detail, filters, shuffleSeed, query]);
 
   if (!gallery) {
     return (
@@ -128,13 +130,17 @@ export function GalleryView() {
     );
   }
 
+  if (slug !== gallery.slug) {
+    return <Navigate replace to={`/g/${gallery.slug}`} />;
+  }
+
   const startSlideshow = () => {
     if (visible.length === 0) return;
     setActiveIndex(0);
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="w-full">
       <div className="mx-auto w-full max-w-7xl px-4 py-4">
         <Link
           to="/"
@@ -153,8 +159,9 @@ export function GalleryView() {
               </p>
             )}
             <p className="mt-1 text-xs text-neutral-500">
-              Showing {visible.length.toLocaleString()} of{" "}
-              {gallery.images.length.toLocaleString()}
+              {detail ? `Showing ${visible.length.toLocaleString()} of ` : ""}
+              {gallery.imageCount.toLocaleString()}
+              {!detail && " images"}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -193,7 +200,7 @@ export function GalleryView() {
             >
               <Play size={16} /> Slideshow
             </button>
-            <DownloadGalleryButton gallery={gallery} />
+            {detail && <DownloadGalleryButton gallery={detail} />}
           </div>
         </div>
         <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -206,7 +213,11 @@ export function GalleryView() {
         </div>
       </div>
 
-      {visible.length === 0 ? (
+      {galleryLoading ? (
+        <p className="py-16 text-center text-neutral-500">Loading gallery...</p>
+      ) : galleryError ? (
+        <p className="py-16 text-center text-red-400">Failed to load gallery: {galleryError}</p>
+      ) : visible.length === 0 ? (
         <p className="py-16 text-center text-neutral-500">
           {query ? `No matches for "${query}".` : "No images match the current filters."}
         </p>
@@ -215,7 +226,7 @@ export function GalleryView() {
           ref={gridRef}
           totalCount={visible.length}
           overscan={600}
-          className="flex-1"
+          useWindowScroll
           listClassName="grid grid-cols-2 gap-3 px-4 pb-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8"
           itemContent={(i) => {
             const img = visible[i];

@@ -3,6 +3,8 @@ import { test, expect, type Page } from "@playwright/test";
 interface ManifestGallery {
   slug: string;
   title: string;
+}
+interface GalleryDetail extends ManifestGallery {
   images: { filename: string; orientation?: string; sizeBucket?: string }[];
 }
 interface ManifestShape {
@@ -12,6 +14,23 @@ interface ManifestShape {
 async function manifest(baseURL: string): Promise<ManifestShape> {
   const r = await fetch(`${baseURL}/manifest.json`);
   return (await r.json()) as ManifestShape;
+}
+
+// Fetches gallery details one by one until `match` succeeds (bounded so a
+// large collection doesn't turn this into a full scan).
+async function findGallery(
+  baseURL: string,
+  match: (g: GalleryDetail) => boolean
+): Promise<GalleryDetail | undefined> {
+  const m = await manifest(baseURL);
+  for (const g of m.galleries.slice(0, 50)) {
+    const r = await fetch(
+      `${baseURL}/data/galleries/${encodeURIComponent(g.slug)}.json`
+    );
+    const detail = (await r.json()) as GalleryDetail;
+    if (match(detail)) return detail;
+  }
+  return undefined;
 }
 
 async function clearGlimrState(page: Page, baseURL: string) {
@@ -228,9 +247,7 @@ test.describe("Gallery image filters", () => {
     page,
     baseURL,
   }) => {
-    const m = await manifest(baseURL!);
-
-    const target = m.galleries.find((g) => {
+    const target = await findGallery(baseURL!, (g) => {
       const buckets = new Set(g.images.map((i) => i.sizeBucket));
       return buckets.size > 1;
     });
@@ -272,8 +289,7 @@ test.describe("Gallery image filters", () => {
   });
 
   test("Orientation filter narrows results", async ({ page, baseURL }) => {
-    const m = await manifest(baseURL!);
-    const target = m.galleries.find((g) => {
+    const target = await findGallery(baseURL!, (g) => {
       const o = new Set(g.images.map((i) => i.orientation));
       return o.size > 1;
     });

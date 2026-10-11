@@ -15,10 +15,22 @@ Built with Vite + React + TypeScript + Tailwind CSS. Storage is currently local;
 
 ```bash
 npm install
+npm run galleries:duplicates   # optional: find duplicate gallery folders
+npm run galleries:prepare      # probe/hash images and write the catalogue
 npm run dev
 ```
 
-Then open http://localhost:5174.
+Then open http://localhost:5174. The home page shows 24 galleries per page; the page number and search query live in the URL (`?page=2&q=...`), so Back returns you to where you were.
+
+## Preparing galleries
+
+Image probing and hashing happen offline, not on every start. Rerun the scripts whenever you add, remove or change gallery folders, then restart `npm run dev`. `npm run dev` refuses to start if the prepared data is missing or in an old format, and warns when gallery folders are newer than it.
+
+- `npm run galleries:duplicates` (`scripts/find-duplicates.ps1`) compares the first image (natural filename order, SHA-256) and the image count of every folder. Folders that match are written to `data/duplicates.json` as candidate groups: the alphabetically first folder is the `root`, the rest are `duplicates`.
+- `npm run galleries:prepare` (`scripts/prepare-galleries.mjs`) probes and hashes every image (cached in `data/image-cache.json`, so reruns only process new or changed files). It verifies each candidate group by comparing the folders' **full** contents: only byte-identical galleries are merged into the canonical gallery, and the merged folder's old URL redirects to it. Rejected candidates and unreadable images are listed in `data/prepare-report.json`. It writes:
+  - `public/manifest.json` — lightweight catalogue used by the home page
+  - `public/data/galleries/<slug>.json` — per-gallery image lists, loaded when a gallery is opened
+  - `public/data/search-index.json` — image filenames/tags, loaded only when searching from the home page
 
 ## Adding a gallery
 
@@ -38,15 +50,17 @@ Then open http://localhost:5174.
    }
    ```
 
-4. Restart `npm run dev` (or run `npm run manifest`) — the manifest is regenerated automatically on dev/build.
+4. Run `npm run galleries:prepare` (and `npm run galleries:duplicates` first if you want duplicate detection), then restart `npm run dev`.
 
 ## Scripts
 
-- `npm run dev` — start Vite dev server (regenerates manifest first)
-- `npm run build` — type-check + build (regenerates manifest first)
-- `npm run manifest` — regenerate `src/data/manifest.json` only
+- `npm run dev` — start Vite dev server (checks the prepared data first)
+- `npm run build` — type-check + build (uses the already-prepared data)
+- `npm run galleries:duplicates` — find duplicate-candidate gallery folders
+- `npm run galleries:prepare` — regenerate the catalogue, gallery data and search index
 - `npm run preview` — preview the production build
 - `npm run lint` — run ESLint
+- `npm run test` / `npm run test:e2e` — unit (Vitest) / end-to-end (Playwright) tests
 
 ## Keyboard shortcuts (image dialog)
 
@@ -58,11 +72,13 @@ Then open http://localhost:5174.
 ## Project structure
 
 ```
-public/galleries/<name>/   image files (+ optional meta.json)
-scripts/build-manifest.mjs scans public/galleries -> src/data/manifest.json
-src/components/            UI components
-src/pages/                 Home, GalleryView
-src/lib/                   search (Fuse.js), zip (JSZip), storage adapter
+public/galleries/<name>/      image files (+ optional meta.json, urls.txt)
+scripts/find-duplicates.ps1   duplicate-candidate finder -> data/duplicates.json
+scripts/prepare-galleries.mjs probes/hashes images -> public/manifest.json, public/data/
+scripts/check-prepared.mjs    predev check that prepared data exists and is current
+src/components/               UI components
+src/pages/                    Home, GalleryView, Favorites
+src/lib/                      manifest loading, search (Fuse.js), zip (JSZip), storage adapter
 ```
 
 ## Swapping storage backend

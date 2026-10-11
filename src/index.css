@@ -1,4 +1,6 @@
-@import "tailwindcss";
+/* Scan only app sources: automatic detection walks the whole repo,
+   adding ~11s to the first CSS request on large gallery collections. */
+@import "tailwindcss" source("../src");
 
 html, body, #root {
   height: 100%;

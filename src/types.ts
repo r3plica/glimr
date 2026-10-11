@@ -13,16 +13,31 @@ export interface GalleryImage {
   sizeBucket?: SizeBucket;
 }
 
-export interface Gallery {
+export interface GallerySummary {
   slug: string;
   title: string;
-  description?: string;
-  tags?: string[];
-  cover?: string;
+  description: string;
+  tags: string[];
+  cover: string;
+  imageCount: number;
+  aliases: string[];
+}
+
+export interface Gallery extends Omit<GallerySummary, "imageCount"> {
   images: GalleryImage[];
 }
 
 export interface Manifest {
+  formatVersion: 2;
   generatedAt: string;
-  galleries: Gallery[];
+  galleries: GallerySummary[];
+}
+
+export interface SearchIndex {
+  formatVersion: 2;
+  galleries: {
+    slug: string;
+    dir: string;
+    images: { filename: string; tags?: string[] }[];
+  }[];
 }

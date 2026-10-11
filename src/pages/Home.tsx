@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Eye, EyeOff, Layers } from "lucide-react";
-import { useManifest } from "../lib/manifest";
+import { useManifest, useSearchIndex } from "../lib/manifest";
 import { GalleryCard } from "../components/GalleryCard";
 import { FavoritesCard } from "../components/FavoritesCard";
 import { SearchBar } from "../components/SearchBar";
 import { searchGlobal } from "../lib/search";
 import { useFavorites } from "../lib/favorites";
 import { useVisited } from "../lib/visited";
+import { paginate } from "../lib/pagination";
+import type { GalleryImage, GallerySummary } from "../types";
 
 type VisitedFilter = "all" | "unviewed" | "viewed";
 
@@ -38,8 +40,11 @@ function loadVisitedFilter(): VisitedFilter {
 export function Home() {
   const { data, loading, error } = useManifest();
   const { count: favCount } = useFavorites();
-  const { has: hasVisited, count: visitedCount } = useVisited();
-  const [query, setQuery] = useState("");
+  const { hasGallery: hasVisited, count: visitedCount } = useVisited();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const query = searchParams.get("q") ?? "";
+  const isSearching = Boolean(query.trim());
+  const { data: searchIndex, loading: searchLoading, error: searchError } = useSearchIndex(isSearching && data.galleries.length > 0);
   const [visitedFilter, setVisitedFilter] = useState<VisitedFilter>(
     loadVisitedFilter
   );
@@ -53,16 +58,16 @@ export function Home() {
   }, [visitedFilter]);
 
   const hits = useMemo(
-    () => searchGlobal(data.galleries, query),
-    [data.galleries, query]
+    () => searchGlobal(data.galleries, searchIndex, query),
+    [data.galleries, searchIndex, query]
   );
 
   const grouped = useMemo(() => {
     const map = new Map<
       string,
       {
-        gallery: (typeof data.galleries)[number];
-        matchedImage?: (typeof data.galleries)[number]["images"][number];
+        gallery: GallerySummary;
+        matchedImage?: GalleryImage;
         imageMatchCount: number;
       }
     >();
@@ -81,14 +86,41 @@ export function Home() {
     }
     let arr = Array.from(map.values());
     if (visitedFilter === "unviewed") {
-      arr = arr.filter((g) => !hasVisited(g.gallery.slug));
+      arr = arr.filter((g) => !hasVisited(g.gallery));
     } else if (visitedFilter === "viewed") {
-      arr = arr.filter((g) => hasVisited(g.gallery.slug));
+      arr = arr.filter((g) => hasVisited(g.gallery));
     }
     return arr;
   }, [hits, visitedFilter, hasVisited]);
 
-  const cycleFilter = () => setVisitedFilter(NEXT_FILTER[visitedFilter]);
+  const { items: pageItems, page, totalPages } = paginate(grouped, searchParams.get("page"), 24);
+  const showFavorites = favCount > 0 && !isSearching && page === 1;
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [page]);
+
+  const setQuery = (value: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (value.trim()) params.set("q", value);
+    else params.delete("q");
+    params.delete("page");
+    setSearchParams(params, { replace: true });
+  };
+
+  const cycleFilter = () => {
+    setVisitedFilter(NEXT_FILTER[visitedFilter]);
+    const params = new URLSearchParams(searchParams);
+    params.delete("page");
+    setSearchParams(params);
+  };
+
+  const changePage = (next: number) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === 1) params.delete("page");
+    else params.set("page", String(next));
+    setSearchParams(params);
+  };
 
   const filterIcon =
     visitedFilter === "unviewed" ? (
@@ -136,34 +168,73 @@ export function Home() {
           Failed to load manifest: {error}
         </p>
       ) : data.galleries.length === 0 ? (
-        <EmptyState />
-      ) : grouped.length === 0 ? (
-        <p className="py-16 text-center text-neutral-500">
-          {query
-            ? `No matches for "${query}".`
-            : visitedFilter === "unviewed"
-              ? "Every gallery has been viewed."
-              : visitedFilter === "viewed"
-                ? "No galleries viewed yet."
-                : "No galleries."}
-        </p>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {favCount > 0 && !query.trim() && visitedFilter === "all" && (
-            <FavoritesCard />
-          )}
-          {grouped.map(({ gallery, matchedImage, imageMatchCount }) => (
-            <div key={gallery.slug} className="flex flex-col">
-              <GalleryCard gallery={gallery} highlightImage={matchedImage} />
-              {imageMatchCount > 0 && (
-                <p className="mt-1 text-[11px] text-neutral-500">
-                  {imageMatchCount} image match
-                  {imageMatchCount === 1 ? "" : "es"}
-                </p>
-              )}
+        <>
+          {showFavorites && (
+            <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              <FavoritesCard />
             </div>
-          ))}
-        </div>
+          )}
+          <EmptyState />
+        </>
+      ) : isSearching && searchLoading ? (
+        <p className="py-16 text-center text-neutral-500" role="status">Searching...</p>
+      ) : isSearching && searchError ? (
+        <p className="py-16 text-center text-red-400">Failed to load search index: {searchError}</p>
+      ) : (
+        <>
+          {(showFavorites || pageItems.length > 0) && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {showFavorites && <FavoritesCard />}
+              {pageItems.map(({ gallery, matchedImage, imageMatchCount }) => (
+                <div key={gallery.slug} className="flex flex-col">
+                  <GalleryCard gallery={gallery} highlightImage={matchedImage} />
+                  {imageMatchCount > 0 && (
+                    <p className="mt-1 text-[11px] text-neutral-500">
+                      {imageMatchCount} image match
+                      {imageMatchCount === 1 ? "" : "es"}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          {grouped.length === 0 && (
+            <p className="py-16 text-center text-neutral-500">
+              {isSearching
+                ? `No matches for "${query}".`
+                : visitedFilter === "unviewed"
+                  ? "Every gallery has been viewed."
+                  : visitedFilter === "viewed"
+                    ? "No galleries viewed yet."
+                    : "No galleries."}
+            </p>
+          )}
+          {totalPages > 1 && (
+            <nav aria-label="Pagination" className="mt-6 flex items-center justify-center gap-4">
+              <button
+                type="button"
+                aria-label="Previous page"
+                data-testid="prev-page"
+                disabled={page === 1}
+                onClick={() => changePage(page - 1)}
+                className="rounded-lg border border-neutral-700 px-3 py-2 text-sm hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Previous page
+              </button>
+              <span className="text-sm text-neutral-400">Page {page} of {totalPages}</span>
+              <button
+                type="button"
+                aria-label="Next page"
+                data-testid="next-page"
+                disabled={page === totalPages}
+                onClick={() => changePage(page + 1)}
+                className="rounded-lg border border-neutral-700 px-3 py-2 text-sm hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Next page
+              </button>
+            </nav>
+          )}
+        </>
       )}
     </div>
   );
@@ -180,7 +251,7 @@ function EmptyState() {
         </code>{" "}
         and run{" "}
         <code className="rounded bg-neutral-800 px-1 py-0.5 text-xs text-neutral-200">
-          npm run manifest
+          npm run galleries:prepare
         </code>
         .
       </p>

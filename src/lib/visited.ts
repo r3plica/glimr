@@ -43,22 +43,34 @@ export function clearVisited(): void {
   writeSet(new Set());
 }
 
+export function hasVisitedGallery(
+  visited: ReadonlySet<string>,
+  gallery: { slug: string; aliases?: string[] }
+): boolean {
+  return visited.has(gallery.slug) ||
+    (gallery.aliases?.some((alias) => visited.has(alias)) ?? false);
+}
+
 export function useVisited() {
   const [version, setVersion] = useState(0);
   useEffect(() => {
     const bump = () => setVersion((v) => v + 1);
     window.addEventListener(EVT, bump);
-    window.addEventListener("storage", (e) => {
-      if (e.key === KEY) bump();
-    });
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === KEY || e.key === null) bump();
+    };
+    window.addEventListener("storage", onStorage);
     return () => {
       window.removeEventListener(EVT, bump);
+      window.removeEventListener("storage", onStorage);
     };
   }, []);
   const set = readSet();
   return {
     version,
     has: (slug: string) => set.has(slug),
+    hasGallery: (gallery: { slug: string; aliases?: string[] }) =>
+      hasVisitedGallery(set, gallery),
     count: set.size,
   };
 }
