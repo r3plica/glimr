@@ -26,7 +26,7 @@ Then open http://localhost:5174. The home page shows 24 galleries per page; the 
 
 Image probing and hashing happen offline, not on every start. Rerun the scripts whenever you add, remove or change gallery folders, then restart `npm run dev`. `npm run dev` refuses to start if the prepared data is missing or in an old format, and warns when gallery folders are newer than it.
 
-- `npm run galleries:duplicates` (`scripts/find-duplicates.ps1`) compares the first image (natural filename order, SHA-256) and the image count of every folder. Folders that match are written to `data/duplicates.json` as candidate groups: the alphabetically first folder is the `root`, the rest are `duplicates`.
+- `npm run galleries:duplicates` (`scripts/find-duplicates.ps1`) hashes **every image** with SHA-256 and compares complete sorted lists of hashes, including repeated-image counts. Only galleries with identical image bytes are written to `data/duplicates.json`: the alphabetically first folder is the `root`, the rest are `duplicates`, and `contentSha256` is the full-gallery signature. Filenames and image order do not affect matching. Shared first images alone never qualify; resized or recompressed images are not exact duplicates. The scan rereads files rather than trusting cached hashes, so it can take longer on large collections. Unreadable files are reported and make the command fail; affected galleries are excluded rather than partially compared.
 - `npm run galleries:prepare` (`scripts/prepare-galleries.mjs`) probes and hashes every image (cached in `data/image-cache.json`, so reruns only process new or changed files). It verifies each candidate group by comparing the folders' **full** contents: only byte-identical galleries are merged into the canonical gallery, and the merged folder's old URL redirects to it. Rejected candidates and unreadable images are listed in `data/prepare-report.json`. It writes:
   - `public/manifest.json` — lightweight catalogue used by the home page
   - `public/data/galleries/<slug>.json` — per-gallery image lists, loaded when a gallery is opened
@@ -56,7 +56,7 @@ Image probing and hashing happen offline, not on every start. Rerun the scripts 
 
 - `npm run dev` — start Vite dev server (checks the prepared data first)
 - `npm run build` — type-check + build (uses the already-prepared data)
-- `npm run galleries:duplicates` — find duplicate-candidate gallery folders
+- `npm run galleries:duplicates` — find byte-identical gallery folders
 - `npm run galleries:prepare` — regenerate the catalogue, gallery data and search index
 - `npm run preview` — preview the production build
 - `npm run lint` — run ESLint
@@ -73,7 +73,7 @@ Image probing and hashing happen offline, not on every start. Rerun the scripts 
 
 ```
 public/galleries/<name>/      image files (+ optional meta.json, urls.txt)
-scripts/find-duplicates.ps1   duplicate-candidate finder -> data/duplicates.json
+scripts/find-duplicates.ps1   full-content duplicate finder -> data/duplicates.json
 scripts/prepare-galleries.mjs probes/hashes images -> public/manifest.json, public/data/
 scripts/check-prepared.mjs    predev check that prepared data exists and is current
 src/components/               UI components

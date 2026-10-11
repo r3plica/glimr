@@ -74,7 +74,7 @@ A private React + Vite + TypeScript image gallery app with searchable galleries,
 - **Image dialog**: `@radix-ui/react-dialog` + `react-zoom-pan-pinch`
 - **Search**: `fuse.js` (per-gallery and global)
 - **Downloads**: `jszip` + `file-saver`
-- **Gallery preparation**: `scripts/find-duplicates.ps1` (duplicate candidates) + `scripts/prepare-galleries.mjs` (probes images with `sharp`, hashes for duplicate verification and cover dedup) — run offline, never on startup
+- **Gallery preparation**: `scripts/find-duplicates.ps1` (full-content duplicate detection) + `scripts/prepare-galleries.mjs` (probes images with `sharp`, hashes for duplicate verification and cover dedup) — run offline, never on startup
 - **Testing**: Playwright (smoke suite in `tests/e2e/`) + Vitest unit tests (`src/**/*.test.ts`, `scripts/**/*.test.mjs`) — no Jest in this project
 
 ## Project Structure
@@ -87,7 +87,7 @@ glimr/
     data/             # galleries/<slug>.json + search-index.json (gitignored)
   data/               # duplicates.json, image-cache.json, prepare-report.json (gitignored)
   scripts/
-    find-duplicates.ps1     # First-image + count duplicate candidates -> data/duplicates.json
+    find-duplicates.ps1     # Full-content SHA-256 duplicate groups -> data/duplicates.json
     prepare-galleries.mjs   # Probes/hashes images, verifies + merges duplicates, writes catalogue
     check-prepared.mjs      # predev check that prepared data exists and is current
     lib/galleries.mjs       # Pure helpers (unit-tested)
@@ -109,7 +109,7 @@ glimr/
 ## Developer Workflows
 
 ```bash
-npm run galleries:duplicates  # Find duplicate-candidate folders -> data/duplicates.json
+npm run galleries:duplicates  # Find byte-identical gallery folders -> data/duplicates.json
 npm run galleries:prepare     # Probe/hash images (cached), write catalogue, gallery data, search index
 npm run dev          # Vite dev server on http://localhost:5174 (predev only checks prepared data)
 npm run build        # tsc -b && vite build (uses already-prepared data)
