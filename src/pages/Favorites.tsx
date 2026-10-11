@@ -29,7 +29,7 @@ export function Favorites() {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="w-full">
       <div className="mx-auto w-full max-w-7xl px-4 py-4">
         <Link
           to="/"
@@ -85,7 +85,7 @@ export function Favorites() {
         <VirtuosoGrid
           totalCount={images.length}
           overscan={600}
-          className="flex-1"
+          useWindowScroll
           listClassName="grid grid-cols-2 gap-3 px-4 pb-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8"
           itemContent={(i) => {
             const fav = favorites[i];
