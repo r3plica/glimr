@@ -9,9 +9,9 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MANIFEST_FILE = path.join(ROOT, "public", "manifest.json");
 const GALLERIES_DIR = path.join(ROOT, "public", "galleries");
-const DUPLICATES_FILE = path.join(ROOT, "data", "duplicates.json");
+const ALIASES_FILE = path.join(ROOT, "data", "folder-aliases.json");
 const HOWTO =
-  "Run `npm run galleries:duplicates` then `npm run galleries:prepare` to prepare gallery data.";
+  "Run `npm run galleries:prepare` to prepare gallery data (optionally `npm run galleries:duplicates -- --apply` first to merge duplicates).";
 
 async function main() {
   let manifestStat;
@@ -45,11 +45,11 @@ async function main() {
     );
   }
   try {
-    if ((await fs.stat(DUPLICATES_FILE)).mtimeMs > preparedAt) {
-      console.warn("[check] data/duplicates.json is newer than the prepared data. Run `npm run galleries:prepare`.");
+    if ((await fs.stat(ALIASES_FILE)).mtimeMs > preparedAt) {
+      console.warn("[check] Galleries were merged since gallery data was prepared. Run `npm run galleries:prepare`.");
     }
   } catch {
-    // Duplicate detection is optional.
+    // No galleries have been merged.
   }
 }
 

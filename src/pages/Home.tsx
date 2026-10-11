@@ -9,6 +9,7 @@ import { searchGlobal } from "../lib/search";
 import { useFavorites } from "../lib/favorites";
 import { useVisited } from "../lib/visited";
 import { paginate } from "../lib/pagination";
+import { DuplicatesLink } from "../components/DuplicatesLink";
 import type { GalleryImage, GallerySummary } from "../types";
 
 type VisitedFilter = "all" | "unviewed" | "viewed";
@@ -147,6 +148,7 @@ export function Home() {
             onChange={setQuery}
             placeholder="Search galleries, images, tags..."
           />
+          <DuplicatesLink />
           <button
             type="button"
             onClick={cycleFilter}

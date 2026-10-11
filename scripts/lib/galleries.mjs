@@ -1,7 +1,5 @@
 // Pure helpers shared by the gallery preparation script and its unit tests.
 
-import { createHash } from "node:crypto";
-
 export const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif", ".svg"]);
 
 export function slugify(name) {
@@ -43,64 +41,6 @@ export function sizeSegOf(url) {
   if (!url) return null;
   const m = url.match(/\/s(\d+)(?:-[^/]*)?\//);
   return m ? Number(m[1]) : null;
-}
-
-// Order-independent fingerprint of a gallery's contents that also respects
-// how many times each image appears. Null when any image could not be hashed,
-// because an unreadable file means the contents cannot be proven identical.
-export function contentSignature(hashes) {
-  if (hashes.length === 0 || hashes.some((h) => !h)) return null;
-  return createHash("sha256").update(hashes.slice().sort().join("\n")).digest("hex");
-}
-
-/**
- * Verifies candidate duplicate groups (from find-duplicates.ps1) against full
- * content signatures. Only folders whose entire contents match are merged.
- *
- * @param {{ root: string, duplicates: string[] }[]} groups
- * @param {Map<string, string | null>} signatureByDir signature per existing gallery folder
- */
-export function verifyDuplicateGroups(groups, signatureByDir) {
-  const aliasOf = new Map();
-  const merges = [];
-  const rejected = [];
-  const missing = [];
-
-  for (const group of groups) {
-    const members = [];
-    for (const dir of [group.root, ...group.duplicates]) {
-      if (members.includes(dir) || aliasOf.has(dir)) continue;
-      if (!signatureByDir.has(dir)) {
-        missing.push({ dir, candidateRoot: group.root });
-        continue;
-      }
-      members.push(dir);
-    }
-
-    const bySignature = new Map();
-    for (const dir of members) {
-      const sig = signatureByDir.get(dir);
-      if (!sig) {
-        rejected.push({ dir, candidateRoot: group.root, reason: "unreadable images" });
-        continue;
-      }
-      const list = bySignature.get(sig) ?? [];
-      list.push(dir);
-      bySignature.set(sig, list);
-    }
-
-    for (const dirs of bySignature.values()) {
-      if (dirs.length < 2) {
-        rejected.push({ dir: dirs[0], candidateRoot: group.root, reason: "contents differ" });
-        continue;
-      }
-      const [canonical, ...aliases] = dirs;
-      for (const a of aliases) aliasOf.set(a, canonical);
-      merges.push({ canonical, aliases });
-    }
-  }
-
-  return { aliasOf, merges, rejected, missing };
 }
 
 /**

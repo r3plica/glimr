@@ -11,6 +11,8 @@ import { FilterBar, type FilterState } from "../components/FilterBar";
 import { searchImages } from "../lib/search";
 import { applyFilters } from "../lib/filters";
 import { markVisited, useVisited } from "../lib/visited";
+import { DuplicateControl } from "../components/DuplicateControl";
+import { DuplicatesLink } from "../components/DuplicatesLink";
 
 const DEFAULT_FILTERS: FilterState = {
   orientation: "any",
@@ -193,6 +195,8 @@ export function GalleryView() {
                 <ChevronRight size={16} />
               </Link>
             )}
+            <DuplicateControl slug={gallery.slug} title={gallery.title} galleries={data.galleries} />
+            <DuplicatesLink />
             <button
               type="button"
               onClick={startSlideshow}

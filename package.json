@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "galleries:duplicates": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/find-duplicates.ps1",
+    "galleries:duplicates": "node scripts/merge-duplicates.mjs",
     "galleries:prepare": "node scripts/prepare-galleries.mjs",
     "predev": "node scripts/check-prepared.mjs",
     "dev": "vite",
