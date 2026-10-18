@@ -9,6 +9,57 @@ export function slugify(name) {
     .replace(/^-+|-+$/g, "");
 }
 
+export function resolveGallerySlugs(galleries, previous = [], aliases = {}) {
+  const previousSlugs = new Map(previous.map((g) => [g.dir, g.slug]));
+  const owners = new Map(previous.map((g) => [g.slug, g.dir]));
+  for (const [slug, dir] of Object.entries(aliases)) {
+    if (!owners.has(slug)) owners.set(slug, dir);
+  }
+  const result = new Map();
+  const claim = (gallery, slug) => {
+    if (typeof slug !== "string" || !slug || /[\\/]/.test(slug) || slug === "." || slug === "..") {
+      throw new Error(`Gallery folder "${gallery.dir}" has an unusable slug "${slug}". Fix its meta.json slug.`);
+    }
+    const owner = owners.get(slug);
+    if (owner !== undefined && owner !== gallery.dir) {
+      throw new Error(
+        `Slug collision "${slug}" between gallery folders "${owner}" and "${gallery.dir}". ` +
+        "Give one of each pair a distinct meta.json slug."
+      );
+    }
+    owners.set(slug, gallery.dir);
+    result.set(gallery.dir, slug);
+  };
+
+  for (const gallery of galleries) {
+    if (gallery.explicitSlug) claim(gallery, gallery.slug);
+  }
+  for (const gallery of galleries) {
+    if (!result.has(gallery.dir) && previousSlugs.has(gallery.dir)) {
+      claim(gallery, previousSlugs.get(gallery.dir));
+    }
+  }
+
+  const pending = galleries.filter((g) => !result.has(g.dir)).sort((a, b) => {
+    const exactA = a.dir === slugify(a.dir);
+    const exactB = b.dir === slugify(b.dir);
+    return Number(exactB) - Number(exactA) || (a.dir < b.dir ? -1 : a.dir > b.dir ? 1 : 0);
+  });
+  // Reserve unsuffixed names before allocating suffixes, including real folders such as "yuno-2".
+  for (const gallery of pending) {
+    const base = slugify(gallery.dir) || "gallery";
+    if (!owners.has(base)) claim(gallery, base);
+  }
+  for (const gallery of pending) {
+    if (result.has(gallery.dir)) continue;
+    const base = slugify(gallery.dir) || "gallery";
+    let suffix = 2;
+    while (owners.has(`${base}-${suffix}`)) suffix++;
+    claim(gallery, `${base}-${suffix}`);
+  }
+  return result;
+}
+
 export function titleCase(name) {
   return name
     .replace(/[-_]+/g, " ")

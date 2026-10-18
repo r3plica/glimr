@@ -39,6 +39,8 @@ Image probing and hashing happen offline, not on every start. Rerun the scripts 
   - `public/data/search-index.json` — image filenames/tags, loaded only when searching from the home page
   - `public/data/moved-images.json` — old image paths of merged galleries, used to show existing favourites
 
+  Folder names that normalize to the same URL slug (for example, `yuno` and `yuno_`) remain separate galleries: generated slugs receive numeric suffixes as needed. The existing search index preserves each folder's assigned slug on later runs, keeping gallery URLs and viewing history stable. Keep `public/data/search-index.json` when regenerating the catalogue. Duplicate or unsafe explicit `meta.json.slug` values still stop preparation with an error before replacing the catalogue; give those galleries distinct safe slugs. Duplicate merging uses the same slug assignments.
+
 ## Marking duplicates
 
 While `npm run dev` (or `npm run preview`) is running, use **Mark as duplicate** on a gallery page to start a duplicate set or add the gallery to an existing one. A set may hold a single gallery while you look for its match, and you can keep any number of unrelated sets. The **Duplicates** link on the home page shows how many sets you have and opens `/duplicates`, where you can remove galleries, delete sets or merge sets. Marks are saved to `data/duplicate-marks.json`. The next `npm run galleries:duplicates -- --apply` merges every set with two or more galleries and removes it; single-gallery sets keep waiting.
