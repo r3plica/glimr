@@ -24,6 +24,7 @@ import {
   sizeBucketFromDims,
   sizeSegOf,
   slugify,
+  resolveGallerySlugs,
   titleCase,
 } from "./lib/galleries.mjs";
 import {
@@ -114,6 +115,7 @@ async function scanGallery(dirName, cache) {
   return {
     dir: dirName,
     slug: meta.slug || slugify(dirName),
+    explicitSlug: Boolean(meta.slug),
     title: meta.title || titleCase(dirName),
     description: meta.description || "",
     tags: meta.tags || [],
@@ -126,12 +128,6 @@ function withoutHash(img) {
   const out = { ...img };
   delete out.hash;
   return out;
-}
-
-function assertSafeSlug(slug, dir) {
-  if (!slug || /[\\/]/.test(slug) || slug === "." || slug === "..") {
-    throw new Error(`Gallery folder "${dir}" has an unusable slug "${slug}". Fix its meta.json slug.`);
-  }
 }
 
 async function main() {
@@ -159,6 +155,15 @@ async function main() {
   }
   await saveCache(CACHE_FILE, cache);
 
+  const previous = await readJson(SEARCH_FILE, { galleries: [] });
+  const slugs = resolveGallerySlugs(scanned, previous.galleries, folderAliases.galleries);
+  for (const gallery of scanned) {
+    gallery.slug = slugs.get(gallery.dir);
+    if (!gallery.explicitSlug && gallery.slug !== slugify(gallery.dir)) {
+      console.log(`[prepare] Folder "${gallery.dir}" uses unique slug "${gallery.slug}".`);
+    }
+  }
+
   const byDir = new Map(scanned.map((g) => [g.dir, g]));
   const liveSlugs = new Set(scanned.map((g) => g.slug));
   const canonical = scanned;
@@ -182,7 +187,6 @@ async function main() {
   const slugOwners = new Map();
   const slugCollisions = [];
   for (const g of canonical) {
-    assertSafeSlug(g.slug, g.dir);
     for (const s of [g.slug, ...(aliasesByDir.get(g.dir) ?? [])]) {
       if (slugOwners.has(s)) slugCollisions.push({ slug: s, dirs: [slugOwners.get(s), g.dir] });
       else slugOwners.set(s, g.dir);

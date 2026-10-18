@@ -17,7 +17,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { IMAGE_EXT, naturalCompare, slugify } from "./lib/galleries.mjs";
+import { IMAGE_EXT, naturalCompare, resolveGallerySlugs, slugify } from "./lib/galleries.mjs";
 import {
   createProbeStats,
   loadCache,
@@ -89,6 +89,7 @@ async function scanFolders(galleriesDir, cache, stats) {
     folders.push({
       dir,
       slug: meta.slug || slugify(dir),
+      explicitSlug: Boolean(meta.slug),
       entries,
       hasUrls: entries.some((e) => e.toLowerCase() === "urls.txt"),
       files: names.map((name, j) => ({ name, hash: probes[j].hash })),
@@ -147,9 +148,14 @@ async function main() {
   const folders = await scanFolders(opts.galleries, cache, stats);
   await saveCache(cacheFile, cache);
 
+  let aliases = await loadAliases(aliasesFile);
+  const previous = await readJson(path.join(opts.galleries, "..", "data", "search-index.json"), { galleries: [] });
+  const slugs = resolveGallerySlugs(folders.filter((f) => f.files.length > 0), previous.galleries, aliases.galleries);
+  for (const folder of folders) {
+    if (slugs.has(folder.dir)) folder.slug = slugs.get(folder.dir);
+  }
   const byDir = new Map(folders.map((f) => [f.dir, f]));
   const slugOfDir = (dir) => byDir.get(dir)?.slug ?? slugify(dir);
-  let aliases = await loadAliases(aliasesFile);
   const dirOfSlug = new Map();
   for (const [slug, dir] of Object.entries(aliases.galleries)) if (byDir.has(dir)) dirOfSlug.set(slug, dir);
   for (const f of folders) dirOfSlug.set(f.slug, f.dir);
